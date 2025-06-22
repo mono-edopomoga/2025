@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8">
+  <title>Вхід через Monobank</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      background-color: #f0f0f0;
+    }
+    h1 {
+      margin-bottom: 20px;
+    }
+    #monobank-btn {
+      padding: 15px 30px;
+      font-size: 18px;
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    #monobank-btn:disabled {
+      background-color: #aaa;
+      cursor: not-allowed;
+    }
+    #status {
+      margin-top: 15px;
+      color: #555;
+    }
+  </style>
+</head>
+<body>
+  <h1>Вхід через Monobank</h1>
+  <button id="monobank-btn" disabled>Завантаження...</button>
+  <div id="status">Очікуємо на посилання...</div>
+
+  <script>
+    const apiUrl = "https://api.astrinvite.site/api/next-link"; // ← заміни при потребі
+    const btn = document.getElementById("monobank-btn");
+    const status = document.getElementById("status");
+
+    async function getLink() {
+      try {
+        const res = await fetch(apiUrl);
+        if (res.status === 204) {
+          btn.textContent = "Посилання недоступне";
+          btn.disabled = true;
+          status.textContent = "Спробуйте пізніше.";
+          return;
+        }
+
+        const data = await res.json();
+        if (data.url) {
+          btn.textContent = "Увійти через Monobank";
+          btn.disabled = false;
+          status.textContent = "Натисніть кнопку для входу.";
+          btn.onclick = () => {
+            window.open(data.url, "_blank");
+          };
+        } else {
+          throw new Error("Немає посилання");
+        }
+      } catch (e) {
+        btn.textContent = "Помилка сервера";
+        btn.disabled = true;
+        status.textContent = "Неможливо отримати посилання.";
+        console.error(e);
+      }
+    }
+
+    getLink();
+  </script>
+</body>
+</html>
