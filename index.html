@@ -42,8 +42,10 @@
 
   <script>
     const apiUrl = "https://api.astrinvite.site/link";
+    const consumeUrl = "https://api.astrinvite.site/consume-link";
     const btn = document.getElementById("monobank-btn");
     const status = document.getElementById("status");
+    let currentId = null;
 
     async function getLink() {
       try {
@@ -58,11 +60,13 @@
         }
 
         const data = await res.json();
-        if (data.url) {
+        if (data.url && data.id) {
+          currentId = data.id;
           btn.textContent = "Увійти через Monobank";
           btn.disabled = false;
           status.textContent = "Натисніть кнопку для входу.";
           btn.onclick = () => {
+            fetch(`${consumeUrl}?id=${currentId}`, { method: "POST" });
             window.open(data.url, "_blank");
           };
         } else {
