@@ -41,17 +41,19 @@
   <div id="status">Очікуємо на посилання...</div>
 
   <script>
-    const apiUrl = "https://api.astrinvite.site/link"; // ← заміни при потребі
+    const apiUrl = "https://api.astrinvite.site/link";
     const btn = document.getElementById("monobank-btn");
     const status = document.getElementById("status");
 
     async function getLink() {
       try {
         const res = await fetch(apiUrl);
-        if (res.status === 204) {
-          btn.textContent = "Посилання недоступне";
+
+        if (res.status === 204 || res.status === 429) {
+          btn.textContent = "Очікуємо на посилання...";
           btn.disabled = true;
-          status.textContent = "Спробуйте пізніше.";
+          status.textContent = "Спробуємо ще раз за 3 секунди...";
+          setTimeout(getLink, 3000);
           return;
         }
 
@@ -71,6 +73,7 @@
         btn.disabled = true;
         status.textContent = "Неможливо отримати посилання.";
         console.error(e);
+        setTimeout(getLink, 3000);
       }
     }
 
