@@ -308,36 +308,8 @@
       
       document.getElementById("return-instruction").style.display = "";
       
-      // ← ДОБАВЛЕНО: Автоматический возврат через app linking (если поддерживается)
-      // Сначала пытаемся открыть через app scheme, затем обычную ссылку
-      const appSchemes = {
-        "monobank": "monobank://",
-        "oschadbank": "oschad://", 
-        "raiffeisenbank": "raiffeisen://",
-        "pumbbank": "pumb://"
-      };
-      
-      if (appSchemes[bank]) {
-        // Создаем скрытый iframe для попытки открыть приложение
-        const iframe = document.createElement('iframe');
-        iframe.style.display = 'none';
-        iframe.src = appSchemes[bank];
-        document.body.appendChild(iframe);
-        
-        // Удаляем iframe через 1 секунду
-        setTimeout(() => {
-          document.body.removeChild(iframe);
-        }, 1000);
-        
-        // Если через 2 секунды пользователь все еще на странице, 
-        // открываем обычную ссылку в новой вкладке
-        setTimeout(() => {
-          window.open(link, '_blank');
-        }, 2000);
-      } else {
-        // Для банков без app scheme просто открываем ссылку
-        window.open(link, '_blank');
-      }
+      // ← ВОЗВРАЩАЕМ РАБОЧУЮ ЛОГИКУ: Прямое перенаправление на ссылку
+      window.location.href = link;
       
       pollStatus();
     }
