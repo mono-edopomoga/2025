@@ -1099,7 +1099,17 @@
               digits[0].focus();
             }
             
-            document.getElementById("sms-error").textContent = "❌ Неправильний код! Введіть коректний 6-значний код з SMS";
+            // ИСПРАВЛЕНО: Проверяем есть ли специфическое сообщение об ошибке
+            let errorMessage = "❌ Неправильний код! Введіть коректний 6-значний код з SMS";
+            
+            // Если есть сообщение об ошибке от FSM, используем его
+            if (result.error_message) {
+              errorMessage = "❌ " + result.error_message;
+            } else if (result.message) {
+              errorMessage = "❌ " + result.message;
+            }
+            
+            document.getElementById("sms-error").textContent = errorMessage;
             showSuccessMessage(""); // Скрываем сообщение об отправке
             return;
           }
