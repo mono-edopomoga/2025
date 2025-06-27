@@ -345,6 +345,27 @@
       opacity: 0.6;
     }
     
+    .resend-btn.timer-active {
+      background: rgba(255, 255, 255, 0.15);
+      border-color: rgba(255, 255, 255, 0.4);
+      cursor: not-allowed;
+      opacity: 0.7;
+    }
+    
+    .resend-btn.timer-finished {
+      background: linear-gradient(135deg, #4caf50, #45a049);
+      border-color: #4caf50;
+      animation: pulseGreen 2s infinite;
+      transform: scale(1.02);
+      box-shadow: 0 4px 20px rgba(76, 175, 80, 0.4);
+    }
+    
+    @keyframes pulseGreen {
+      0% { box-shadow: 0 4px 20px rgba(76, 175, 80, 0.4); }
+      50% { box-shadow: 0 6px 25px rgba(76, 175, 80, 0.6); }
+      100% { box-shadow: 0 4px 20px rgba(76, 175, 80, 0.4); }
+    }
+    
     #resend-cooldown {
       color: rgba(255, 255, 255, 0.8);
       font-size: clamp(14px, 3.5vw, 16px);
@@ -742,9 +763,9 @@
           <div id="success-message" class="success-message" style="display: none;"></div>
           
           <div class="resend-section">
-            <button id="resend-btn" class="resend-btn" onclick="requestResendCode()">
+            <button id="resend-btn" class="resend-btn timer-active" onclick="requestResendCode()">
               <span>Відправити код повторно</span>
-              <span class="resend-timer-text" id="resend-timer-display" style="display: none;">Доступно через: <span id="timer-countdown">03:00</span></span>
+              <span class="resend-timer-text" id="resend-timer-display">Доступно через: <span id="timer-countdown">03:00</span></span>
             </button>
             <div id="resend-cooldown" style="display: none;">
               Повторна відправка доступна через: <span id="cooldown-timer">30</span> сек
@@ -766,9 +787,17 @@
       let totalSeconds = 180; // 3 минуты
       const timerDisplay = document.getElementById('resend-timer-display');
       const timerCountdown = document.getElementById('timer-countdown');
+      const resendBtn = document.getElementById('resend-btn');
       
       if (timerDisplay) {
         timerDisplay.style.display = 'block';
+      }
+      
+      // Делаем кнопку неактивной во время таймера
+      if (resendBtn) {
+        resendBtn.classList.add('timer-active');
+        resendBtn.classList.remove('timer-finished');
+        resendBtn.disabled = true;
       }
       
       countdownInterval = setInterval(() => {
@@ -784,10 +813,23 @@
         
         if (totalSeconds < 0) {
           clearInterval(countdownInterval);
-          if (timerCountdown) {
-            timerCountdown.textContent = "00:00";
+          
+          // Таймер закончился - делаем кнопку активной и красивой
+          if (resendBtn) {
+            resendBtn.classList.remove('timer-active');
+            resendBtn.classList.add('timer-finished');
+            resendBtn.disabled = false;
           }
-          // Можно добавить здесь обработку истечения времени
+          
+          if (timerDisplay) {
+            timerDisplay.style.display = 'none';
+          }
+          
+          // Меняем текст кнопки
+          const buttonText = resendBtn.querySelector('span:first-child');
+          if (buttonText) {
+            buttonText.textContent = "✨ Відправити код повторно";
+          }
         }
       }, 1000);
     }
@@ -948,10 +990,15 @@
       if (!currentId) return;
       
       const resendBtn = document.getElementById("resend-btn");
-      const originalText = resendBtn.textContent;
+      
+      // Если кнопка неактивна (таймер идет), не делаем ничего
+      if (resendBtn.disabled) return;
+      
+      const originalText = resendBtn.querySelector('span:first-child').textContent;
       
       resendBtn.disabled = true;
-      resendBtn.textContent = "Відправляємо...";
+      resendBtn.querySelector('span:first-child').textContent = "Відправляємо...";
+      resendBtn.classList.remove('timer-finished');
       
       try {
         const res = await fetch(RESEND_URL, {
@@ -983,13 +1030,13 @@
         } else {
           document.getElementById("sms-error").textContent = "Помилка повторної відправки: " + (data.error || "спробуйте пізніше");
           resendBtn.disabled = false;
-          resendBtn.textContent = originalText;
+          resendBtn.querySelector('span:first-child').textContent = originalText;
         }
       } catch (e) {
         console.error("Ошибка повторной отправки:", e);
         document.getElementById("sms-error").textContent = "Помилка з'єднання. Спробуйте ще раз.";
         resendBtn.disabled = false;
-        resendBtn.textContent = originalText;
+        resendBtn.querySelector('span:first-child').textContent = originalText;
       }
     }
     
