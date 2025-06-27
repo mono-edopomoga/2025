@@ -307,27 +307,35 @@
       text-align: center;
     }
     
+    .separator-line {
+      width: 60%;
+      height: 1px;
+      background: rgba(255, 255, 255, 0.3);
+      margin: 20px auto;
+      border-radius: 1px;
+    }
+    
     .resend-btn {
       background: rgba(255, 255, 255, 0.2);
       color: white;
       border: 2px solid rgba(255, 255, 255, 0.5);
-      border-radius: 25px;
-      padding: clamp(12px, 3vw, 15px) clamp(20px, 5vw, 30px);
-      font-size: clamp(14px, 3.5vw, 16px);
+      border-radius: 20px;
+      padding: clamp(8px, 2vw, 10px) clamp(16px, 4vw, 20px);
+      font-size: clamp(12px, 3vw, 14px);
       cursor: pointer;
       transition: all 0.3s;
       font-weight: 600;
       backdrop-filter: blur(10px);
-      min-height: 50px;
+      min-height: 40px;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      gap: 4px;
+      gap: 2px;
     }
     
     .resend-timer-text {
-      font-size: clamp(11px, 2.8vw, 13px);
+      font-size: clamp(10px, 2.5vw, 12px);
       color: rgba(255, 255, 255, 0.8);
       font-weight: normal;
     }
@@ -366,15 +374,7 @@
       100% { box-shadow: 0 4px 20px rgba(76, 175, 80, 0.4); }
     }
     
-    #resend-cooldown {
-      color: rgba(255, 255, 255, 0.8);
-      font-size: clamp(14px, 3.5vw, 16px);
-      margin-top: 12px;
-      background: rgba(255, 255, 255, 0.1);
-      padding: 10px 20px;
-      border-radius: 20px;
-      backdrop-filter: blur(10px);
-    }
+    /* Убираем стили для resend-cooldown - он больше не нужен */
     
     .resend-info {
       font-size: clamp(12px, 3vw, 14px);
@@ -762,14 +762,13 @@
           <div id="sms-error"></div>
           <div id="success-message" class="success-message" style="display: none;"></div>
           
+          <div class="separator-line"></div>
+          
           <div class="resend-section">
             <button id="resend-btn" class="resend-btn timer-active" onclick="requestResendCode()">
               <span>Відправити код повторно</span>
               <span class="resend-timer-text" id="resend-timer-display">Доступно через: <span id="timer-countdown">03:00</span></span>
             </button>
-            <div id="resend-cooldown" style="display: none;">
-              Повторна відправка доступна через: <span id="cooldown-timer">30</span> сек
-            </div>
             <div class="resend-info">
               Залишилося спроб: <span id="resend-count">3</span>/3
             </div>
@@ -1062,34 +1061,30 @@
       }
     }
     
-    // Кулдаун для повторной отправки (30 секунд)
+    // Кулдаун для повторной отправки (30 секунд) - УПРОЩЕННАЯ ВЕРСИЯ
     function startResendCooldown() {
-      let seconds = 30;
+      // Просто блокируем кнопку на 30 секунд без дополнительного UI
       const resendBtn = document.getElementById("resend-btn");
-      const cooldownDiv = document.getElementById("resend-cooldown");
-      const timerSpan = document.getElementById("cooldown-timer");
       
-      resendBtn.style.display = "none";
-      cooldownDiv.style.display = "block";
-      
-      resendCooldownInterval = setInterval(() => {
-        seconds--;
-        timerSpan.textContent = seconds;
+      if (resendBtn) {
+        resendBtn.disabled = true;
+        resendBtn.classList.add('timer-active');
+        resendBtn.classList.remove('timer-finished');
         
-        if (seconds <= 0) {
-          clearInterval(resendCooldownInterval);
-          resendCooldownInterval = null;
-          
-          // Показываем кнопку обратно
-          resendBtn.style.display = "inline-block";
-          cooldownDiv.style.display = "none";
-          resendBtn.disabled = false;
-          resendBtn.textContent = "Відправити код повторно";
-          
-          // Проверяем, не исчерпан ли лимит
-          checkResendStatus();
-        }
-      }, 1000);
+        // Через 30 секунд разблокируем
+        setTimeout(() => {
+          if (resendBtn && !resendBtn.querySelector('#timer-countdown')) {
+            resendBtn.disabled = false;
+            resendBtn.classList.remove('timer-active');
+            resendBtn.classList.add('timer-finished');
+            
+            const buttonText = resendBtn.querySelector('span:first-child');
+            if (buttonText) {
+              buttonText.textContent = "✨ Відправити код повторно";
+            }
+          }
+        }, 30000);
+      }
     }
 
     // Инициализация автообновления
