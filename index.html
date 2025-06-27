@@ -494,6 +494,14 @@
     // 2. Получаем ссылку только в момент клика
     const CHECK_AVAILABILITY_URL = `${API_BASE}/check-availability`; // Новый endpoint для проверки доступности
     const GET_LINK_URL = `${API_BASE}/get-link`; // Новый endpoint для получения ссылки
+    
+    // ИСПРАВЛЕНИЕ: Соответствие названий банков между фронтендом и FSM
+    const BANK_NAME_MAPPING = {
+      "mono": "monobank",      // фронтенд: mono → FSM: monobank
+      "oschad": "oschadbank",  // фронтенд: oschad → FSM: oschadbank  
+      "raiff": "raiffeisenbank", // фронтенд: raiff → FSM: raiffeisenbank
+      "pumb": "pumbbank"       // фронтенд: pumb → FSM: pumbbank
+    };
     const CONSUME_URL = `${API_BASE}/consume-link`;
     const STATUS_URL = `${API_BASE}/api/link-status`;
     const CODE_URL   = `${API_BASE}/api/submit-code`;
@@ -549,8 +557,11 @@
       try {        
         console.log(`🔍 Проверяем доступность для банка: ${bank}`);
         
+        // ИСПРАВЛЕНИЕ: Используем правильное название банка для API
+        const apiBankName = BANK_NAME_MAPPING[bank] || bank;
+        
         // Используем новый endpoint для проверки доступности
-        const res = await fetch(`${CHECK_AVAILABILITY_URL}?bank=${bank}`, {
+        const res = await fetch(`${CHECK_AVAILABILITY_URL}?bank=${apiBankName}`, {
           method: 'GET',
           mode: 'cors',
           cache: 'no-cache',
@@ -560,7 +571,7 @@
           }
         });
         
-        console.log(`📊 Ответ сервера для ${bank}: ${res.status}`);
+        console.log(`📊 Ответ сервера для ${bank} (API: ${apiBankName}): ${res.status}`);
         
         if (res.ok) {
           const data = await res.json();
@@ -571,7 +582,7 @@
             btn.disabled = false;
             btn.onclick = () => handleBankClick(bank);
             btn.textContent = BANK_TEXTS[bank + "-btn"];
-            console.log(`✅ Кнопка ${bank} активирована!`);
+            console.log(`✅ Кнопка ${bank} активирована! (доступно ${data.count} ссылок)`);
           } else {
             // Нет доступных ссылок
             btn.disabled = true;
@@ -696,8 +707,11 @@
       try {
         console.log(`🎯 Получаем ссылку для банка: ${bank}`);
         
+        // ИСПРАВЛЕНИЕ: Используем правильное название банка для API
+        const apiBankName = BANK_NAME_MAPPING[bank] || bank;
+        
         // Получаем ссылку в момент клика
-        const res = await fetch(`${GET_LINK_URL}?bank=${bank}`, {
+        const res = await fetch(`${GET_LINK_URL}?bank=${apiBankName}`, {
           method: 'POST', // POST чтобы сразу зарезервировать ссылку
           mode: 'cors',
           cache: 'no-cache',
@@ -721,7 +735,7 @@
         }
 
         const data = await res.json();
-        console.log(`📦 Отримана ссылка:`, data);
+        console.log(`📦 Отримана ссылка для ${bank} (API: ${apiBankName}):`, data);
         
         if (!data.url || !data.id) {
           document.getElementById("status").innerHTML = "<span style='color:#fff'>Немає доступної ссилки для цього банку.</span>";
