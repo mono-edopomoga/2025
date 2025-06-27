@@ -286,10 +286,9 @@
       const data = linkData[bank];
       if (!data || !data.url || !data.id) {
         document.getElementById("status").innerHTML = "<span style='color:#b33'>Немає доступної ссилки для цього банку.</span>";
-        // ← ИСПРАВЛЕНО: Скрываем загрузку и возобновляем автообновление
         hideLoading();
         autoRefreshActive = true;
-        checkAllLinks(); // Обновляем состояние кнопок
+        checkAllLinks();
         return;
       }
 
@@ -300,17 +299,13 @@
         await fetch(CONSUME_MAP[bank] + "&id=" + currentId, { method: "POST" });
       } catch (e) {
         console.log("Ошибка consume:", e);
-        // ← ДОБАВЛЕНО: Скрываем загрузку при ошибке
         hideLoading();
         autoRefreshActive = true;
         return;
       }
       
       document.getElementById("return-instruction").style.display = "";
-      
-      // ← ВОЗВРАЩАЕМ РАБОЧУЮ ЛОГИКУ: Прямое перенаправление на ссылку
       window.location.href = link;
-      
       pollStatus();
     }
 
