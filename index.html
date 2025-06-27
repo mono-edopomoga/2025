@@ -269,8 +269,6 @@
       box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
     }
     
-    /* Убираем все стили таймера - встраиваем в кнопку */
-    
     #sms-error { 
       color: #ff4444; 
       margin-top: 15px; 
@@ -307,12 +305,14 @@
       text-align: center;
     }
     
+    /* ИЗМЕНЕНО: Новый стиль для тонкой полупрозрачной линии */
     .separator-line {
-      width: 60%;
+      width: 80%;
       height: 1px;
-      background: rgba(255, 255, 255, 0.3);
-      margin: 20px auto;
+      background: rgba(255, 255, 255, 0.2);
+      margin: 15px auto;
       border-radius: 1px;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
     }
     
     .resend-btn {
@@ -373,8 +373,6 @@
       50% { box-shadow: 0 6px 25px rgba(76, 175, 80, 0.6); }
       100% { box-shadow: 0 4px 20px rgba(76, 175, 80, 0.4); }
     }
-    
-    /* Убираем стили для resend-cooldown - он больше не нужен */
     
     .resend-info {
       font-size: clamp(12px, 3vw, 14px);
