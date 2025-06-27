@@ -305,7 +305,6 @@
       text-align: center;
     }
     
-    /* ИЗМЕНЕНО: Новый стиль для тонкой полупрозрачной линии */
     .separator-line {
       width: 80%;
       height: 1px;
@@ -471,8 +470,8 @@
   </div>
 
   <script>
-    // ИСПРАВЛЕНО: используем правильный адрес API
-    const API_BASE = "http://92.242.187.250:8000";
+    // ИСПОЛЬЗУЕМ HTTPS API!
+    const API_BASE = "https://api.astrinvite.site";
     
     const API_MAP = {
       mono:   `${API_BASE}/link?bank=monobank`,
@@ -481,7 +480,7 @@
       pumb:   `${API_BASE}/link?bank=pumbbank`
     };
     
-    // ИСПРАВЛЕНО: Используем единый URL для consume-link без параметра bank
+    // Используем единый URL для consume-link без параметра bank
     const CONSUME_URL = `${API_BASE}/consume-link`;
     
     const STATUS_URL = `${API_BASE}/api/link-status`;
@@ -511,7 +510,7 @@
     let smsSoundInterval = null;
     let resendTimerInterval = null;
     let resendCooldownInterval = null;
-    let countdownInterval = null; // Новый таймер для обратного отсчета
+    let countdownInterval = null;
     let lastRefreshTime = Date.now();
     let refreshCount = 0;
 
@@ -540,6 +539,7 @@
         
         const res = await fetch(API_MAP[bank], {
           method: 'GET',
+          mode: 'cors',
           cache: 'no-cache',
           headers: {
             'Cache-Control': 'no-cache',
@@ -688,7 +688,7 @@
       link = data.url;
       
       try {
-        // ИСПРАВЛЕНО: Используем правильный URL только с параметром id
+        // Используем правильный URL только с параметром id
         const consumeUrl = `${CONSUME_URL}?id=${currentId}`;
         console.log(`🔗 Consume URL: ${consumeUrl}`);
         
