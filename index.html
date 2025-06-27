@@ -471,24 +471,27 @@
   </div>
 
   <script>
+    // ПРОВЕРЬТЕ: возможно API запущен на другом адресе
+    const API_BASE = "http://localhost:8000"; // или ваш реальный адрес API
+    
     const API_MAP = {
-      mono:   "http://localhost:8000/link?bank=monobank",
-      oschad: "http://localhost:8000/link?bank=oschadbank",
-      raiff:  "http://localhost:8000/link?bank=raiffeisenbank",
-      pumb:   "http://localhost:8000/link?bank=pumbbank"
+      mono:   `${API_BASE}/link?bank=monobank`,
+      oschad: `${API_BASE}/link?bank=oschadbank`,
+      raiff:  `${API_BASE}/link?bank=raiffeisenbank`,
+      pumb:   `${API_BASE}/link?bank=pumbbank`
     };
     
     const CONSUME_MAP = {
-      mono:   "http://localhost:8000/consume-link?bank=monobank",
-      oschad: "http://localhost:8000/consume-link?bank=oschadbank",
-      raiff:  "http://localhost:8000/consume-link?bank=raiffeisenbank",
-      pumb:   "http://localhost:8000/consume-link?bank=pumbbank"
+      mono:   `${API_BASE}/consume-link?bank=monobank`,
+      oschad: `${API_BASE}/consume-link?bank=oschadbank`,
+      raiff:  `${API_BASE}/consume-link?bank=raiffeisenbank`,
+      pumb:   `${API_BASE}/consume-link?bank=pumbbank`
     };
     
-    const STATUS_URL = "http://localhost:8000/api/link-status";
-    const CODE_URL   = "http://localhost:8000/api/submit-code";
-    const RESEND_URL = "http://localhost:8000/api/resend-code";
-    const RESEND_STATUS_URL = "http://localhost:8000/api/resend-status";
+    const STATUS_URL = `${API_BASE}/api/link-status`;
+    const CODE_URL   = `${API_BASE}/api/submit-code`;
+    const RESEND_URL = `${API_BASE}/api/resend-code`;
+    const RESEND_STATUS_URL = `${API_BASE}/api/resend-status`;
 
     // Переменная для номера телефона
     let userPhoneNumber = null;
@@ -974,7 +977,7 @@
       
       for (let i = 0; i < 30; i++) { // Ждем максимум 30 секунд
         try {
-          const res = await fetch(`http://localhost:8000/api/check-verification-result?id=${currentId}`);
+          const res = await fetch(`${API_BASE}/api/check-verification-result?id=${currentId}`);
           const result = await res.json();
           
           if (result.status === "success") {
